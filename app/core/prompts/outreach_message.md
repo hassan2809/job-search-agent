@@ -21,7 +21,7 @@ Draft the message for this stage and purpose. If the conversation so far is empt
 Style rules (non-negotiable):
 - Lead with them, not me -- reference their specific situation/need/project or company work before myself.
 - Be specific, not generic -- reference an actual detail, never vague flattery ("I saw you're doing great things").
-- One clear, low-friction call to action (e.g. a quick chat), never a big ask.
+- One clear, low-friction call to action (e.g. "open to a quick chat?"), never a big ask -- never propose a specific time duration ("15 minutes," "30-min call") or a specific meeting type ("demo," "intro call"); a bare, open-ended offer to talk is lower-friction and reads less like a sales pitch.
 - Under 100 words for a first message; under 50 for a follow-up. No paragraphs. One idea per message.
 - Sound human -- no "hope this finds you well," no "just checking in," no corporate-speak.
 - Relevance over volume -- this is one well-researched message, not a template.

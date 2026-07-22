@@ -16,18 +16,13 @@ class LLMClient(ABC):
 def get_llm_client() -> LLMClient:
     provider = settings.llm_provider.strip().lower()
 
-    if provider == "anthropic":
-        from app.services.llm.anthropic_client import AnthropicLLMClient
+    if provider == "groq":
+        from app.services.llm.groq_client import GroqLLMClient
 
-        return AnthropicLLMClient()
-
-    if provider == "openai":
-        from app.services.llm.openai_client import OpenAILLMClient
-
-        return OpenAILLMClient()
+        return GroqLLMClient()
 
     raise LLMNotConfiguredError(
-        "No LLM provider configured yet. Set LLM_PROVIDER=anthropic|openai (plus the matching "
-        "API key) in .env once a provider is chosen -- everything that calls the LLM (fit-check, "
-        "drafting, reply suggestions) will work as soon as this is set, no other code changes needed."
+        "No LLM provider configured yet. Set LLM_PROVIDER=groq (plus GROQ_API_KEY) in .env -- "
+        "everything that calls the LLM (fit-check, drafting, reply suggestions) will work as soon "
+        "as this is set, no other code changes needed."
     )

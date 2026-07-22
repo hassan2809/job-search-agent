@@ -17,7 +17,7 @@ Based on the most recent message from "them", draft my next reply. Handle it app
 
 Style rules (non-negotiable):
 - Specific to what they actually said, never a generic template reply.
-- One clear, low-friction call to action, never a big ask.
+- One clear, low-friction call to action, never a big ask -- never propose a specific time duration ("15 minutes," "30-min call") or a specific meeting type ("demo," "intro call"); a bare, open-ended offer to talk is lower-friction and reads less like a sales pitch.
 - Under 100 words. No paragraphs. One idea.
 - Sound human -- no "hope this finds you well," no "just checking in," no corporate-speak.
 - Relevance over volume -- this is one specific reply to one specific person, not a template.
