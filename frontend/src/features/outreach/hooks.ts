@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '@/api/client'
 import { outreachApi } from '@/api/outreach'
+import type { OutreachDetailOut } from '@/api/types'
 
 export const outreachKeys = {
   detail: (id: number) => ['outreach', id] as const,
+  byLead: (leadId: number) => ['outreach', 'by-lead', leadId] as const,
   needsNextMessage: (minDaysOverride?: number) => ['outreach', 'needs-next-message', minDaysOverride] as const,
 }
 
@@ -14,6 +17,21 @@ export function useOutreach(id: number) {
   })
 }
 
+export function useOutreachByLead(leadId: number) {
+  return useQuery({
+    queryKey: outreachKeys.byLead(leadId),
+    queryFn: async (): Promise<OutreachDetailOut | null> => {
+      try {
+        return await outreachApi.getByLead(leadId)
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) return null
+        throw e
+      }
+    },
+    enabled: leadId > 0,
+  })
+}
+
 export function useNeedsNextMessage(minDaysOverride?: number) {
   return useQuery({
     queryKey: outreachKeys.needsNextMessage(minDaysOverride),
@@ -21,8 +39,6 @@ export function useNeedsNextMessage(minDaysOverride?: number) {
   })
 }
 
-// Fit-check and connect are idempotent server-side (see app/api/v1/outreach.py) -- re-running
-// without force just returns the existing result, so these mutations are safe to fire freely.
 export function useFitCheck() {
   return useMutation({
     mutationFn: ({ leadId, force }: { leadId: number; force?: boolean }) => outreachApi.fitCheck(leadId, force),
@@ -35,6 +51,7 @@ export function useConnect() {
     mutationFn: ({ leadId, force }: { leadId: number; force?: boolean }) => outreachApi.connect(leadId, force),
     onSuccess: (data) => {
       queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
     },
   })
 }
@@ -45,6 +62,7 @@ export function useMarkConnectionSent() {
     mutationFn: (id: number) => outreachApi.markConnectionSent(id),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
     },
   })
 }
@@ -56,6 +74,7 @@ export function useConnectionResponse() {
       outreachApi.connectionResponse(id, status),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
     },
   })
 }
@@ -66,6 +85,7 @@ export function useNextMessage() {
     mutationFn: (id: number) => outreachApi.nextMessage(id),
     onSuccess: (data) => {
       queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
     },
   })
 }
@@ -76,6 +96,7 @@ export function useMarkSent() {
     mutationFn: (id: number) => outreachApi.markSent(id),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
     },
   })
 }
@@ -86,6 +107,7 @@ export function useReply() {
     mutationFn: ({ id, body }: { id: number; body: string }) => outreachApi.reply(id, body),
     onSuccess: (data) => {
       queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
     },
   })
 }
@@ -97,6 +119,7 @@ export function useCloseOutreach() {
       outreachApi.close(id, status),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
     },
   })
 }

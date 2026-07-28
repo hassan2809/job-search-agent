@@ -144,6 +144,18 @@ def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) ->
     return _detail(new_outreach, db)
 
 
+@router.get("/by-lead/{lead_id}", response_model=OutreachDetailOut)
+def get_outreach_by_lead(lead_id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
+    """Lets the lead detail page look up its outreach state (if any) without already knowing the
+    outreach id -- /connect returns the id once created, but a page reload only has the lead id."""
+    outreach = db.execute(
+        select(Outreach).where(Outreach.lead_id == lead_id).order_by(Outreach.created_at.desc())
+    ).scalars().first()
+    if not outreach:
+        raise HTTPException(status_code=404, detail="No outreach yet for this lead")
+    return _detail(outreach, db)
+
+
 @router.post("/{id}/mark-connection-sent", response_model=OutreachOut)
 def mark_connection_sent(id: int, db: Session = Depends(get_db)) -> Outreach:
     outreach = _get_outreach_or_404(id, db)

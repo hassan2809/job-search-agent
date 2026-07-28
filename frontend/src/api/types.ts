@@ -1,5 +1,23 @@
 // Mirrors app/schemas/lead.py and app/schemas/outreach.py.
 
+export type FitVerdict = 'good_fit' | 'maybe' | 'not_a_fit'
+export type FitStatusFilter = FitVerdict | 'not_checked'
+
+// Mirrors OUTREACH_STATUSES in app/api/v1/leads.py (Outreach.status values plus "not_started").
+export type OutreachStatusFilter =
+  | 'not_started'
+  | 'connection_drafted'
+  | 'connection_sent'
+  | 'connection_accepted'
+  | 'connection_declined'
+  | 'connection_no_response'
+  | 'message_drafted'
+  | 'awaiting_reply'
+  | 'replied'
+  | 'closed_won'
+  | 'closed_declined'
+  | 'closed_no_response'
+
 export interface LeadOut {
   id: number
   source: string
@@ -13,6 +31,8 @@ export interface LeadOut {
   origin_type: 'disclosed_need' | 'prospected'
   posted_at: string | null
   fetched_at: string
+  latest_verdict: FitVerdict | null
+  latest_outreach_status: Exclude<OutreachStatusFilter, 'not_started'> | null
 }
 
 export interface LeadManualIn {
@@ -28,10 +48,15 @@ export interface IngestResult {
   skipped_duplicates: number
 }
 
+export interface LeadListOut {
+  items: LeadOut[]
+  total: number
+}
+
 export interface MatchOut {
   id: number
   lead_id: number
-  fit_verdict: 'good_fit' | 'maybe' | 'not_a_fit'
+  fit_verdict: FitVerdict
   fit_reasoning: string
   created_at: string
 }

@@ -27,4 +27,5 @@ export const outreachApi = {
     ),
 
   get: (id: number) => api.get<OutreachDetailOut>(`/outreach/${id}`),
+  getByLead: (leadId: number) => api.get<OutreachDetailOut>(`/outreach/by-lead/${leadId}`),
 }

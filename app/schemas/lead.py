@@ -18,6 +18,8 @@ class LeadOut(BaseModel):
     origin_type: str
     posted_at: datetime | None
     fetched_at: datetime
+    latest_verdict: str | None = None
+    latest_outreach_status: str | None = None
 
 
 class LeadManualIn(BaseModel):
@@ -31,3 +33,8 @@ class IngestResult(BaseModel):
     fetched: int
     inserted: int
     skipped_duplicates: int
+
+
+class LeadListOut(BaseModel):
+    items: list[LeadOut]
+    total: int
