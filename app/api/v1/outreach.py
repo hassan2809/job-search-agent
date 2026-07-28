@@ -82,8 +82,19 @@ def _detail(outreach: Outreach, db: Session) -> OutreachDetailOut:
 
 
 @router.post("/{lead_id}/fit-check", response_model=MatchOut)
-def fit_check(lead_id: int, db: Session = Depends(get_db)) -> Match:
+def fit_check(lead_id: int, force: bool = False, db: Session = Depends(get_db)) -> Match:
+    """Idempotent by default -- if a fit-check already ran for this lead, returns it instead of
+    spending another LLM call. Pass force=true to deliberately re-run it (e.g. after the lead's
+    description changed)."""
     lead = _get_lead_or_404(lead_id, db)
+
+    if not force:
+        existing = db.execute(
+            select(Match).where(Match.lead_id == lead.id).order_by(Match.created_at.desc())
+        ).scalars().first()
+        if existing:
+            return existing
+
     try:
         verdict, reasoning = outreach_service.run_fit_check(lead)
     except LLMNotConfiguredError as e:
@@ -97,8 +108,17 @@ def fit_check(lead_id: int, db: Session = Depends(get_db)) -> Match:
 
 
 @router.post("/{lead_id}/connect", response_model=OutreachDetailOut)
-def connect(lead_id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
+def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) -> OutreachDetailOut:
+    """Idempotent by default -- if a connection note was already drafted for this lead, returns
+    it instead of spending another LLM call. Pass force=true to deliberately draft another one."""
     lead = _get_lead_or_404(lead_id, db)
+
+    if not force:
+        existing = db.execute(
+            select(Outreach).where(Outreach.lead_id == lead.id).order_by(Outreach.created_at.desc())
+        ).scalars().first()
+        if existing:
+            return _detail(existing, db)
 
     latest_match = db.execute(
         select(Match).where(Match.lead_id == lead.id).order_by(Match.created_at.desc())

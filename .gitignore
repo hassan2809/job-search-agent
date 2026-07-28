@@ -17,3 +17,5 @@ wheels/
 
 _internal/
 shared-data/
+.playwright-profile/
+scripts/

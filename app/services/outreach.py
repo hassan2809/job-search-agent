@@ -18,14 +18,24 @@ ORIGIN_GUIDANCE = {
 }
 
 _COPYWRITER_SYSTEM_PROMPT = "You are a concise, specific outreach copywriter. Relevance over volume."
+MAX_DESCRIPTION_CHARS = 12_000
+MAX_FIT_REASONING_CHARS = 1_500
+MAX_THREAD_MESSAGE_CHARS = 4_000
+
+
+def _cap(text: str, limit: int) -> str:
+    return text[:limit] if len(text) > limit else text
 
 
 def _lead_text(lead: Lead) -> str:
-    return f"Title: {lead.title}\nURL: {lead.url}\nAuthor: {lead.author}\n\n{lead.description}"
+    description = _cap(lead.description, MAX_DESCRIPTION_CHARS)
+    return f"Title: {lead.title}\nURL: {lead.url}\nAuthor: {lead.author}\n\n{description}"
 
 
 def _thread_text(thread: list[OutreachMessage]) -> str:
-    return "\n".join(f"{'me' if m.sender == 'me' else 'them'}: {m.body}" for m in thread)
+    return "\n".join(
+        f"{'me' if m.sender == 'me' else 'them'}: {_cap(m.body, MAX_THREAD_MESSAGE_CHARS)}" for m in thread
+    )
 
 
 def run_fit_check(lead: Lead) -> tuple[str, str]:
@@ -44,7 +54,7 @@ def draft_connection_note(lead: Lead, fit_reasoning: str) -> str:
         "connection_note",
         resume_text=get_resume_text(),
         lead_text=_lead_text(lead),
-        fit_reasoning=fit_reasoning,
+        fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS),
     )
     return get_llm_client().generate(system=_COPYWRITER_SYSTEM_PROMPT, user=prompt).strip()
 
@@ -60,7 +70,7 @@ def draft_next_message(
         "outreach_message",
         resume_text=get_resume_text(),
         lead_text=_lead_text(lead),
-        fit_reasoning=fit_reasoning,
+        fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS),
         origin_guidance=ORIGIN_GUIDANCE.get(origin_type, ORIGIN_GUIDANCE["prospected"]),
         thread_text=_thread_text(thread),
         stage_purpose=stage_purpose,

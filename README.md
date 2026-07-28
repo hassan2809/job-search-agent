@@ -1,8 +1,6 @@
 # Client Outreach Agent
 
-An agent that helps me reach out on LinkedIn to people/companies who need full-stack or AI project work done. It checks fit against my resume, drafts a connection note and follow-up messages, and tracks the conversation — with a human-approval step before anything is ever sent. Built as a hands-on learning project while transitioning from full-stack development into Agentic AI.
-
-Leads are sourced by hand (a weekly Excel export, or one-off pastes) rather than scraped, since most platforms worth sourcing from prohibit automated scraping in their ToS.
+An agent that helps me reach out on LinkedIn to people/companies who need full-stack or AI project work done. It checks fit against my resume, drafts a connection note and follow-up messages, and tracks the conversation — with a human-approval step before anything is ever sent. Built as a hands-on learning project while transitioning from full-stack development into Agentic AI. Leads are sourced by hand (a weekly Excel export, or one-off pastes).
 
 ## Stack
 

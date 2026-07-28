@@ -21,8 +21,14 @@ def get_llm_client() -> LLMClient:
 
         return GroqLLMClient()
 
+    if provider == "openai":
+        from app.services.llm.openai_client import OpenAILLMClient
+
+        return OpenAILLMClient()
+
     raise LLMNotConfiguredError(
-        "No LLM provider configured yet. Set LLM_PROVIDER=groq (plus GROQ_API_KEY) in .env -- "
-        "everything that calls the LLM (fit-check, drafting, reply suggestions) will work as soon "
-        "as this is set, no other code changes needed."
+        "No LLM provider configured yet. Set LLM_PROVIDER=groq (plus GROQ_API_KEY) or "
+        "LLM_PROVIDER=openai (plus OPENAI_API_KEY) in .env -- everything that calls the LLM "
+        "(fit-check, drafting, reply suggestions) will work as soon as this is set, no other "
+        "code changes needed."
     )

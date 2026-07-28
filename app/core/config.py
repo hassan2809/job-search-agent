@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     # LLM provider -- see app/services/llm/client.py's factory.
     llm_provider: str = ""
     groq_api_key: str = ""
+    openai_api_key: str = ""
 
 
 settings = Settings()
