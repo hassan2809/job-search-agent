@@ -54,4 +54,4 @@ class ReplyIn(BaseModel):
 
 
 class CloseIn(BaseModel):
-    status: str  # closed_won | closed_declined | closed_no_response
+    status: str  # closed_won | closed_declined | closed_no_response | closed_not_interested

@@ -22,22 +22,58 @@ from app.services.llm.client import LLMNotConfiguredError
 
 router = APIRouter()
 
-# From linkedin_outreach_strategies.txt's "Message Timing Guidelines" table. Our /connect
-# note = their "Initial Connection". Everything after that is ONE continuous sequence --
-# not a structurally different "first message" vs "follow-ups" -- each stage with its own
-# purpose and minimum spacing:
-#   First Follow-up:  3-5 days after acceptance -- value proposition (min_days: 0, you decide
-#                      when to send the first one, no minimum enforced)
-#   Second Follow-up: 5-7 days later   -- share a relevant case study
-#   Third Follow-up:  7-10 days later  -- specific solution proposal
-#   Final Message:    14-21 days after third -- soft close or alternative offer
-# Manually-triggered only, never on a timer -- this table sets minimum spacing and a cap,
-# not an automatic schedule.
+# Our /connect note = the "Initial Connection" touch. Everything after that is ONE continuous
+# sequence -- not a structurally different "first message" vs "follow-ups" -- each stage with its
+# own purpose and minimum spacing. Manually-triggered only, never on a timer: this sets minimum
+# spacing and a cap, not an automatic schedule.
+#
+# Spacing is 3 / 5 / 6 / 7, a 21-day span. The two research files disagree on how long this should
+# take, so this splits them deliberately:
+#   linkedin_outreach_strategies.txt's "Message Timing Guidelines" table sums to 29 days
+#     (3-5, then 5-7, then 7-10, then 14-21) -- but the same file's conclusion says "3-4 touchpoints
+#     over 2-3 weeks yield optimal results", which the table contradicts.
+#   c2b_outreach_strategies.txt is tighter: first follow-up 3-5 business days, subsequent ones
+#     4-7 days apart, whole sequence done inside ~15 days, and stop after 3 follow-ups.
+# 21 days satisfies c2b's 4-7 day gaps, lands inside the LinkedIn file's own "2-3 weeks", and stays
+# clear of the 30-day mark c2b cites for deleting contact data you never heard back from.
+# Four stages = one opener plus three follow-ups, which is c2b's "2-3 follow-ups then stop".
+# min_days on stage 0 only bites once /mark-reply-sent exists: before it, 'awaiting_reply' was
+# reachable only via /mark-sent, which always implies message_count >= 1, so stage 0's spacing was
+# never consulted. Now that replying can park you at 'awaiting_reply' with nothing staged sent yet,
+# 0 here would report "follow-up due now" the moment you send a reply. 3 matches the table's
+# "First Follow-up: 3-5 days after acceptance". Drafting the first message straight after
+# connection_accepted is unaffected -- that path never consults this.
+# The strategy doc's ladder is written for an agency selling a service (value proposition ->
+# case study -> solution proposal -> soft close). I'm a developer looking for work, not a vendor,
+# so the same four-step spacing is kept but each step is what a developer would actually say.
 MESSAGE_STAGES = [
-    {"purpose": "Value proposition -- state clearly and specifically how I can help", "min_days": 0},
-    {"purpose": "Share a relevant case study or concrete proof point", "min_days": 5},
-    {"purpose": "Propose a specific next step or solution", "min_days": 7},
-    {"purpose": "Soft close -- a graceful final message offering a lower-commitment alternative, or a clean way to end the thread", "min_days": 14},
+    {
+        "purpose": "Lead with their product, mission or open role and why it genuinely interests "
+        "me. One sentence at most on the part of my background that connects, then an open question",
+        "min_days": 3,
+    },
+    {
+        "purpose": "Go deeper on something specific in their world, and show one thing I have "
+        "built that speaks to it, honestly scoped, with the stack. It must be a DIFFERENT project "
+        "from any already mentioned in the conversation above -- read what has been sent, then pick "
+        "the next most relevant one from my background. Repeating the same project is what makes a "
+        "follow-up feel like a resend. Point at something they can actually check",
+        "min_days": 5,
+    },
+    {
+        "purpose": "Still anchored to their work, ask plainly whether there is a role, a contract or "
+        "a project where I would fit, or who I should be talking to",
+        "min_days": 6,
+    },
+    {
+        "purpose": "SOFT CLOSE. This is the one message in the sequence that sells nothing and "
+        "asks for nothing, and the SHAPE rules do not apply to it. Do NOT name a project. Do NOT "
+        "describe anything I have built. Do NOT include a stack. Do NOT end with a question. The "
+        "whole message is: they were good to connect with, I will leave it here, the door is open "
+        "if anything comes up later. Two or three sentences, warm and final. My portfolio link may "
+        "appear once at the end, plainly, and nothing else. If it reads like a pitch, it is wrong",
+        "min_days": 7,
+    },
 ]
 MAX_MESSAGE_STAGES = len(MESSAGE_STAGES)
 
@@ -46,6 +82,11 @@ CONNECTION_RESPONSE_STATUS_MAP = {
     "declined": "connection_declined",
     "no_response": "connection_no_response",
 }
+
+# closed_not_interested covers *my* decision to stop pursuing a lead regardless of anything they
+# said or didn't say -- distinct from closed_declined (they said no) and closed_no_response (they
+# never replied), both of which describe the lead's behavior, not mine.
+CLOSE_STATUSES = {"closed_won", "closed_declined", "closed_no_response", "closed_not_interested"}
 
 
 def _get_lead_or_404(lead_id: int, db: Session) -> Lead:
@@ -144,6 +185,38 @@ def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) ->
     return _detail(new_outreach, db)
 
 
+@router.post("/{lead_id}/pass", response_model=OutreachOut)
+def pass_on_lead(lead_id: int, db: Session = Depends(get_db)) -> Outreach:
+    """Marks a lead as not worth pursuing, at any point -- including before fit-check/connect ever
+    happen. Every other close path requires an Outreach to already exist (you can only /close an
+    outreach_id), which meant there was no way to bail on a lead you'd decided against just from
+    reading the profile. Creates the Outreach record here if one doesn't exist yet; reuses and
+    re-closes it if one does, so this also works as a fast "never mind" from any later stage."""
+    lead = _get_lead_or_404(lead_id, db)
+
+    outreach = db.execute(
+        select(Outreach).where(Outreach.lead_id == lead_id).order_by(Outreach.created_at.desc())
+    ).scalars().first()
+
+    if outreach:
+        outreach.status = "closed_not_interested"
+    else:
+        latest_match = db.execute(
+            select(Match).where(Match.lead_id == lead_id).order_by(Match.created_at.desc())
+        ).scalars().first()
+        outreach = Outreach(
+            lead_id=lead.id,
+            match_id=latest_match.id if latest_match else None,
+            origin_type=lead.origin_type,
+            status="closed_not_interested",
+        )
+        db.add(outreach)
+
+    db.commit()
+    db.refresh(outreach)
+    return outreach
+
+
 @router.get("/by-lead/{lead_id}", response_model=OutreachDetailOut)
 def get_outreach_by_lead(lead_id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
     """Lets the lead detail page look up its outreach state (if any) without already knowing the
@@ -186,13 +259,19 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
     """Drafts the next message in the sequence -- the first real pitch (right after connection
     acceptance) and every follow-up alike, since they're one continuous sequence, not separate
     actions. Which stage (value proposition / case study / solution proposal / soft close) is
-    determined by how many have already been sent."""
+    determined by how many have already been sent.
+
+    Allowed from 'replied' too: a reply pauses the sequence, it doesn't end it. People routinely
+    accept a connection with nothing more than "nice to meet you", and someone saying "ping me next
+    quarter" mid-sequence shouldn't strand the remaining stages either. The stage cap below is what
+    stops this turning into nagging."""
     outreach = _get_outreach_or_404(id, db)
 
-    if outreach.status not in ("connection_accepted", "awaiting_reply"):
+    if outreach.status not in ("connection_accepted", "awaiting_reply", "replied"):
         raise HTTPException(
             status_code=409,
-            detail=f"Outreach is in status '{outreach.status}', expected 'connection_accepted' or 'awaiting_reply'",
+            detail=f"Outreach is in status '{outreach.status}', expected one of 'connection_accepted', "
+            "'awaiting_reply', 'replied'",
         )
     if outreach.message_count >= MAX_MESSAGE_STAGES:
         raise HTTPException(
@@ -208,7 +287,12 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
 
     try:
         message_body = outreach_service.draft_next_message(
-            lead, _thread(outreach.id, db), fit_reasoning, outreach.origin_type, stage_purpose
+            lead,
+            _thread(outreach.id, db),
+            fit_reasoning,
+            outreach.origin_type,
+            stage_purpose,
+            outreach.message_count,
         )
     except LLMNotConfiguredError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -225,6 +309,20 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
 def mark_sent(id: int, db: Session = Depends(get_db)) -> Outreach:
     outreach = _get_outreach_or_404(id, db)
     _require_status(outreach, "message_drafted")
+    outreach.status = "awaiting_reply"
+    db.commit()
+    db.refresh(outreach)
+    return outreach
+
+
+@router.post("/{id}/mark-reply-sent", response_model=OutreachOut)
+def mark_reply_sent(id: int, db: Session = Depends(get_db)) -> Outreach:
+    """Records that I sent the suggested response that /reply drafted. Lands back on
+    'awaiting_reply' -- I've said something and the ball is in their court again, exactly as it is
+    after marking a staged message sent. Without this a thread sticks in 'replied' forever and the
+    UI keeps telling you to review a suggestion you already sent."""
+    outreach = _get_outreach_or_404(id, db)
+    _require_status(outreach, "replied")
     outreach.status = "awaiting_reply"
     db.commit()
     db.refresh(outreach)
@@ -254,6 +352,9 @@ def reply(id: int, reply_in: ReplyIn, db: Session = Depends(get_db)) -> Outreach
 
 @router.post("/{id}/close", response_model=OutreachOut)
 def close(id: int, close_in: CloseIn, db: Session = Depends(get_db)) -> Outreach:
+    if close_in.status not in CLOSE_STATUSES:
+        raise HTTPException(status_code=400, detail=f"status must be one of: {', '.join(sorted(CLOSE_STATUSES))}")
+
     outreach = _get_outreach_or_404(id, db)
     outreach.status = close_in.status
     db.commit()
