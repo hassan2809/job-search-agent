@@ -41,7 +41,7 @@ export interface LeadOut {
 
 export interface LeadManualIn {
   url: string
-  raw_content: string
+  raw_content?: string
   origin_type?: 'disclosed_need' | 'prospected'
   author?: string
 }

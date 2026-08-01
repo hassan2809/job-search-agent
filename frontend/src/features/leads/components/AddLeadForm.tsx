@@ -17,20 +17,25 @@ import type { LeadManualIn } from '@/api/types'
 export function AddLeadForm() {
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
-  const [rawContent, setRawContent] = useState('')
   const [originType, setOriginType] = useState<LeadManualIn['origin_type']>('prospected')
+  const [rawContent, setRawContent] = useState('')
+  const [showPaste, setShowPaste] = useState(false)
   const addLead = useAddLead()
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     addLead.mutate(
-      { url, raw_content: rawContent, origin_type: originType },
+      { url, origin_type: originType, raw_content: rawContent.trim() || undefined },
       {
         onSuccess: () => {
           setUrl('')
           setRawContent('')
+          setShowPaste(false)
           setOpen(false)
         },
+        // A scrape failure leaves the lead saved but empty, and re-submitting the same URL retries
+        // it. Open the paste box so the fallback is right there instead of a dead end.
+        onError: () => setShowPaste(true),
       },
     )
   }
@@ -42,7 +47,9 @@ export function AddLeadForm() {
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Add a lead</DialogTitle>
-            <DialogDescription>Paste a LinkedIn profile/post URL and its content.</DialogDescription>
+            <DialogDescription>
+              Paste a LinkedIn profile URL. On submit we scrape and save the profile.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-3 py-4">
@@ -52,13 +59,7 @@ export function AddLeadForm() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               required
-            />
-            <Textarea
-              placeholder="Paste the profile/post content here"
-              value={rawContent}
-              onChange={(e) => setRawContent(e.target.value)}
-              rows={5}
-              required
+              disabled={addLead.isPending}
             />
             <div className="flex items-center gap-4 text-sm">
               <label className="flex items-center gap-1.5">
@@ -67,6 +68,7 @@ export function AddLeadForm() {
                   name="origin_type"
                   checked={originType === 'disclosed_need'}
                   onChange={() => setOriginType('disclosed_need')}
+                  disabled={addLead.isPending}
                 />
                 Disclosed need
               </label>
@@ -76,16 +78,47 @@ export function AddLeadForm() {
                   name="origin_type"
                   checked={originType === 'prospected'}
                   onChange={() => setOriginType('prospected')}
+                  disabled={addLead.isPending}
                 />
                 Prospected
               </label>
             </div>
             {addLead.error && <p className="text-sm text-destructive">{addLead.error.message}</p>}
+
+            {showPaste ? (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm text-muted-foreground">
+                  Profile text (optional). Paste the profile here to skip scraping entirely, which is
+                  the way through when LinkedIn asks for a login.
+                </label>
+                <Textarea
+                  rows={6}
+                  placeholder="Paste the full LinkedIn profile text..."
+                  value={rawContent}
+                  onChange={(e) => setRawContent(e.target.value)}
+                  disabled={addLead.isPending}
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="self-start text-sm text-muted-foreground underline underline-offset-4"
+                onClick={() => setShowPaste(true)}
+              >
+                Paste profile text instead of scraping
+              </button>
+            )}
           </div>
 
           <DialogFooter>
             <Button type="submit" disabled={addLead.isPending}>
-              {addLead.isPending ? 'Adding...' : 'Add lead'}
+              {addLead.isPending
+                ? rawContent.trim()
+                  ? 'Saving...'
+                  : 'Scraping profile...'
+                : addLead.error
+                  ? 'Retry'
+                  : 'Add lead'}
             </Button>
           </DialogFooter>
         </form>
