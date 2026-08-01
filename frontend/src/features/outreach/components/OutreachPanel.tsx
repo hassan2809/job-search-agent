@@ -1,23 +1,24 @@
 import { useState } from 'react'
 import { MessageThread } from './MessageThread'
+import { ActionNotice } from './ActionNotice'
 import {
   useCloseOutreach,
   useConnect,
   useConnectionResponse,
   useMarkConnectionSent,
+  useMarkReplySent,
   useMarkSent,
   useNextMessage,
   useOutreachByLead,
+  usePassOnLead,
   useReply,
 } from '../hooks'
+import { MAX_MESSAGE_STAGES, MESSAGE_STAGES } from '../constants'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { FitVerdict } from '@/api/types'
-
-const MAX_MESSAGE_STAGES = 4
-const STAGE_LABELS = ['Value proposition', 'Case study', 'Solution proposal', 'Soft close']
 
 function ErrorText({ error }: { error: Error | null }) {
   if (!error) return null
@@ -31,30 +32,50 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
   const connectionResponse = useConnectionResponse()
   const nextMessage = useNextMessage()
   const markSent = useMarkSent()
+  const markReplySent = useMarkReplySent()
   const reply = useReply()
   const closeOutreach = useCloseOutreach()
+  const passOnLead = usePassOnLead()
   const [replyBody, setReplyBody] = useState('')
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading outreach status...</p>
 
   if (!outreach) {
-    if (!fitVerdict) {
-      return <p className="text-sm text-muted-foreground">Run a fit-check first to unlock outreach.</p>
-    }
-    if (fitVerdict === 'not_a_fit') {
-      return <p className="text-sm text-muted-foreground">Fit-check came back "not a fit" — no connection request.</p>
-    }
+    const canConnect = fitVerdict && fitVerdict !== 'not_a_fit'
     return (
       <div className="flex flex-col gap-2">
-        <Button size="sm" disabled={connect.isPending} onClick={() => connect.mutate({ leadId })}>
-          {connect.isPending ? 'Drafting...' : 'Send connection request'}
-        </Button>
-        <ErrorText error={connect.error} />
+        {!fitVerdict && <p className="text-sm text-muted-foreground">Run a fit-check first to unlock outreach.</p>}
+        {fitVerdict === 'not_a_fit' && (
+          <p className="text-sm text-muted-foreground">Fit-check came back "not a fit" — no connection request.</p>
+        )}
+        <div className="flex gap-2">
+          {canConnect && (
+            <Button size="sm" disabled={connect.isPending} onClick={() => connect.mutate({ leadId })}>
+              {connect.isPending ? 'Drafting...' : 'Send connection request'}
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={passOnLead.isPending}
+            onClick={() => passOnLead.mutate(leadId)}
+          >
+            {passOnLead.isPending ? 'Saving...' : 'Not interested (my call)'}
+          </Button>
+        </div>
+        <ErrorText error={connect.error ?? passOnLead.error} />
       </div>
     )
   }
 
-  const closedStatuses = ['connection_declined', 'connection_no_response', 'closed_won', 'closed_declined', 'closed_no_response']
+  const closedStatuses = [
+    'connection_declined',
+    'connection_no_response',
+    'closed_won',
+    'closed_declined',
+    'closed_no_response',
+    'closed_not_interested',
+  ]
   if (closedStatuses.includes(outreach.status)) {
     return (
       <div className="flex flex-col gap-3">
@@ -74,6 +95,8 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
           </span>
         )}
       </div>
+
+      <ActionNotice outreach={outreach} />
 
       <MessageThread messages={outreach.messages} />
 
@@ -118,13 +141,16 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
         </div>
       )}
 
-      {(outreach.status === 'connection_accepted' || outreach.status === 'awaiting_reply') &&
+      {/* Also offered from 'replied' -- a reply pauses the staged sequence, it doesn't end it. */}
+      {(outreach.status === 'connection_accepted' ||
+        outreach.status === 'awaiting_reply' ||
+        outreach.status === 'replied') &&
         outreach.message_count < MAX_MESSAGE_STAGES && (
           <div className="flex flex-col gap-2">
             <Button size="sm" disabled={nextMessage.isPending} onClick={() => nextMessage.mutate(outreach.id)}>
               {nextMessage.isPending
                 ? 'Drafting...'
-                : `Draft next message (${STAGE_LABELS[outreach.message_count]})`}
+                : `Draft next message (${MESSAGE_STAGES[outreach.message_count].label})`}
             </Button>
             <ErrorText error={nextMessage.error} />
           </div>
@@ -139,7 +165,24 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
         </div>
       )}
 
-      {(outreach.status === 'awaiting_reply' || outreach.status === 'replied') && (
+      {outreach.status === 'replied' && (
+        <div className="flex flex-col gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={markReplySent.isPending}
+            onClick={() => markReplySent.mutate(outreach.id)}
+          >
+            {markReplySent.isPending ? 'Saving...' : 'Mark suggested reply sent'}
+          </Button>
+          <ErrorText error={markReplySent.error} />
+        </div>
+      )}
+
+      {/* Also offered from 'connection_accepted' -- people often send a note when they accept. */}
+      {(outreach.status === 'connection_accepted' ||
+        outreach.status === 'awaiting_reply' ||
+        outreach.status === 'replied') && (
         <Card size="sm">
           <CardHeader>
             <CardTitle className="text-sm">Log their reply</CardTitle>
@@ -193,6 +236,14 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
           onClick={() => closeOutreach.mutate({ id: outreach.id, status: 'closed_no_response' })}
         >
           No response
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={closeOutreach.isPending}
+          onClick={() => closeOutreach.mutate({ id: outreach.id, status: 'closed_not_interested' })}
+        >
+          Not interested (my call)
         </Button>
       </div>
     </div>

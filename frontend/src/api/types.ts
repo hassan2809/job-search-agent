@@ -3,6 +3,9 @@
 export type FitVerdict = 'good_fit' | 'maybe' | 'not_a_fit'
 export type FitStatusFilter = FitVerdict | 'not_checked'
 
+// Mirrors CLOSE_STATUSES in app/api/v1/outreach.py.
+export type CloseStatus = 'closed_won' | 'closed_declined' | 'closed_no_response' | 'closed_not_interested'
+
 // Mirrors OUTREACH_STATUSES in app/api/v1/leads.py (Outreach.status values plus "not_started").
 export type OutreachStatusFilter =
   | 'not_started'
@@ -17,6 +20,7 @@ export type OutreachStatusFilter =
   | 'closed_won'
   | 'closed_declined'
   | 'closed_no_response'
+  | 'closed_not_interested'
 
 export interface LeadOut {
   id: number

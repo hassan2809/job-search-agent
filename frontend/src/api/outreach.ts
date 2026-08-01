@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { MatchOut, NeedsNextMessageOut, OutreachDetailOut, OutreachOut } from './types'
+import type { CloseStatus, MatchOut, NeedsNextMessageOut, OutreachDetailOut, OutreachOut } from './types'
 
 export const outreachApi = {
   // Both idempotent by default (see app/api/v1/outreach.py) -- pass force to deliberately re-run.
@@ -7,6 +7,8 @@ export const outreachApi = {
     api.post<MatchOut>(`/outreach/${leadId}/fit-check${force ? '?force=true' : ''}`),
   connect: (leadId: number, force = false) =>
     api.post<OutreachDetailOut>(`/outreach/${leadId}/connect${force ? '?force=true' : ''}`),
+  // Marks the lead as not worth pursuing at any point -- even before fit-check/connect happen.
+  pass: (leadId: number) => api.post<OutreachOut>(`/outreach/${leadId}/pass`),
 
   markConnectionSent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-connection-sent`),
   connectionResponse: (id: number, status: 'accepted' | 'declined' | 'no_response') =>
@@ -17,9 +19,10 @@ export const outreachApi = {
 
   // body: one new message, or a full pasted thread to sync retroactively.
   reply: (id: number, body: string) => api.post<OutreachDetailOut>(`/outreach/${id}/reply`, { body }),
+  // Records that the suggested response was actually sent -- returns the thread to awaiting_reply.
+  markReplySent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-reply-sent`),
 
-  close: (id: number, status: 'closed_won' | 'closed_declined' | 'closed_no_response') =>
-    api.post<OutreachOut>(`/outreach/${id}/close`, { status }),
+  close: (id: number, status: CloseStatus) => api.post<OutreachOut>(`/outreach/${id}/close`, { status }),
 
   needsNextMessage: (minDaysOverride?: number) =>
     api.get<NeedsNextMessageOut[]>(

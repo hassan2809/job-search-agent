@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { AddLeadForm } from './AddLeadForm'
 import { LeadsList } from './LeadsList'
 import { BulkFitCheckDialog } from './BulkFitCheckDialog'
+import { FollowUpsBoard } from '@/features/outreach/components/FollowUpsBoard'
 import { useLeads } from '../hooks'
 import type { LeadFilters } from '@/api/leads'
 import { Input } from '@/components/ui/input'
@@ -51,6 +52,8 @@ export function LeadsPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-6">
+        <FollowUpsBoard />
+
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-1 items-center gap-2">
             <Input
@@ -114,6 +117,7 @@ export function LeadsPage() {
               <NativeSelectOption value="closed_won">Won</NativeSelectOption>
               <NativeSelectOption value="closed_declined">Declined</NativeSelectOption>
               <NativeSelectOption value="closed_no_response">No response (closed)</NativeSelectOption>
+              <NativeSelectOption value="closed_not_interested">Not interested (my call)</NativeSelectOption>
             </NativeSelect>
           </div>
 

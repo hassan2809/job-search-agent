@@ -20,6 +20,7 @@ const OUTREACH_STATUS_VARIANT: Record<string, BadgeVariant> = {
   connection_declined: 'destructive',
   closed_no_response: 'secondary',
   connection_no_response: 'secondary',
+  closed_not_interested: 'secondary',
 }
 const outreachStatusVariant = (status: string): BadgeVariant => OUTREACH_STATUS_VARIANT[status] ?? 'outline'
 

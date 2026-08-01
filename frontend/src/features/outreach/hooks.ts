@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/api/client'
 import { outreachApi } from '@/api/outreach'
-import type { OutreachDetailOut } from '@/api/types'
+import type { CloseStatus, OutreachDetailOut } from '@/api/types'
 
 export const outreachKeys = {
   detail: (id: number) => ['outreach', id] as const,
@@ -52,6 +52,17 @@ export function useConnect() {
     onSuccess: (data) => {
       queryClient.setQueryData(outreachKeys.detail(data.id), data)
       queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
+    },
+  })
+}
+
+export function usePassOnLead() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (leadId: number) => outreachApi.pass(leadId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
     },
   })
 }
@@ -112,11 +123,21 @@ export function useReply() {
   })
 }
 
+export function useMarkReplySent() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => outreachApi.markReplySent(id),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
+    },
+  })
+}
+
 export function useCloseOutreach() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, status }: { id: number; status: 'closed_won' | 'closed_declined' | 'closed_no_response' }) =>
-      outreachApi.close(id, status),
+    mutationFn: ({ id, status }: { id: number; status: CloseStatus }) => outreachApi.close(id, status),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
