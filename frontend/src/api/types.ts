@@ -65,12 +65,37 @@ export interface MatchOut {
   created_at: string
 }
 
+// One deterministic rule a draft broke. `code` is stable and aggregatable (see check-stats);
+// `detail` is the sentence written for a human. Mirrors app/services/message_checks.py.
+export interface CheckFailure {
+  code: string
+  detail: string
+}
+
 export interface OutreachMessageOut {
   id: number
   outreach_id: number
   sender: 'me' | 'them'
   body: string
   created_at: string
+  // Rules this draft STILL breaks after the automatic retry. Empty for clean drafts, for messages
+  // they sent, and for anything drafted before checks existed.
+  check_failures: CheckFailure[]
+}
+
+export interface CheckStatRow {
+  code: string
+  first_attempt: number
+  unresolved: number
+}
+
+export interface CheckStatsOut {
+  drafts: number
+  clean_first_time: number
+  retried: number
+  retry_fixed_all: number
+  still_broken: number
+  by_rule: CheckStatRow[]
 }
 
 export interface OutreachOut {

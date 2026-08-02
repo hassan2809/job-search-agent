@@ -4,10 +4,10 @@ They engaged. The hard part is done. Do not undo it by switching into pitch mode
 
 {positioning}
 
-MY BACKGROUND (resume):
+MY TECHNICAL SKILLS:
 {resume_text}
 
-EVERYTHING I HAVE BUILT (full catalogue -- the resume above only lists a few of these; choose from HERE, and follow its attribution and sharing rules):
+EVERYTHING I HAVE BUILT (choose from HERE, and follow its attribution and sharing rules):
 {projects_text}
 
 THE LEAD (original context):

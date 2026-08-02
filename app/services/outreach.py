@@ -1,10 +1,13 @@
 import re
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from app.core.prompts import load_prompt
 from app.models.lead import Lead
 from app.models.outreach import OutreachMessage
 from app.services.llm.client import get_llm_client
-from app.services.resume import get_projects_text, get_resume_text
+from app.services.message_checks import Failure, check_connection_note, check_message
+from app.services.resume import get_projects_text, get_skills_text, select_projects
 
 VERDICT_PATTERN = re.compile(r"VERDICT:\s*(good_fit|maybe|not_a_fit)", re.IGNORECASE)
 REASONING_PATTERN = re.compile(r"REASONING:\s*(.+)", re.IGNORECASE | re.DOTALL)
@@ -13,49 +16,31 @@ REASONING_PATTERN = re.compile(r"REASONING:\s*(.+)", re.IGNORECASE | re.DOTALL)
 # this the model reads big platform numbers off it and writes as though I were an agency selling
 # services -- offering to audit a stranger's systems, claiming their scale as my own results.
 SELF_POSITIONING = """WHO I AM (this governs the tone -- do not drift from it):
-I am one developer, roughly two years into my career, currently employed as a full-stack developer
-building client products at a small agency. I am looking for a job, a contract, or project work.
-I am NOT an agency, a consultancy, or a founder selling a service. There is no team behind me.
+I am one developer, roughly two years into my career, employed as a full-stack developer building
+client products at a small agency. I am looking for a job, a contract, or project work. I am NOT an
+agency or a consultancy, and there is no team behind me.
 
-What follows from that:
-- Never write as a vendor pitching services. Never offer to audit, review, assess, or produce a
-  report, checklist or recommendation on how someone should run their business. Coming from someone
-  at my level to someone senior, that reads as presumptuous and gets ignored.
-- The numbers in my resume ($3M+ monthly volume, 50,000+ shipments, 60% faster processing) describe
-  the SCALE OF PLATFORMS I WORKED ON as one developer on a team. They are not results I personally
-  delivered to a client, and not evidence I can operate at that scale on my own. Reference what I
-  actually built and the stack I used. Never imply I own those business outcomes.
-- Concretely: "I built the inbound and refunds modules of an e-commerce ops platform" is true and
-  worth saying. "I handle $3M+ monthly with end-to-end reconciliation" is not.
-- Being early in my career is not something to hide, and not something to apologise for either.
-  Straightforward and specific beats impressive.
-- What I am asking for is work: whether they are hiring, whether they need a developer on something,
-  or whether they would take a look at what I have built. Never a discovery call, an audit, or a
-  strategy conversation.
-- What I share is my portfolio, hassanmehmood.online. That is the default and usually the only link
-  worth including. The public site of a product I worked on is fine too where the catalogue lists a
-  "Live:" URL. Never a GitHub repo and never an offer to send code, whatever its licence or
-  visibility.
-- Mention ONE project per message, the single most relevant one, named with the employer I built it
-  at. Never list several. Walking through my resume is a resume dump and it reads as self-focused
-  however accurate it is.
-- Never merge two jobs or two projects into one claim. The project catalogue below states which
-  employer each project belongs to, and it is the authority on that. Writing "gateway integrations
-  and the refunds modules for eCom Central" welds KloudPlugins work onto a DeveloperTag product --
-  a factual error the reader can catch, and the fastest way to look like I am padding.
-- Where the catalogue says "Employer: not stated", do not invent one. Name the project on its own
-  ("I built Guard XP, a multi-tenant operations app..."). If it does not say where something was
-  built, neither do I.
-- Never ask permission to send something the message already contains. If the portfolio link is in
-  the text then it is sent, so "may I send my portfolio (hassanmehmood.online)?" contradicts itself.
-  Pick one: either drop the link in plainly ("my portfolio is at hassanmehmood.online if it's
-  useful"), or ask whether they'd like to see it and leave the link out. Including it plainly is
-  usually better -- it is one public URL, and making someone grant permission for a link they can
-  already click is needless ceremony.
-- Never link a repository and never offer to send code, for any project, public or not. No
-  github.com links, no "happy to share the repo", no "the code is on my GitHub". The portfolio is
-  what I point people at, and a "Live:" product URL from the catalogue is the only other link that
-  belongs in a message."""
+- Never write as a vendor. Never offer to audit, review, or produce a report, checklist or
+  recommendation on how someone should run their business: from me to someone senior that reads as
+  presumptuous and gets ignored.
+- What I offer is specific technical relief, not broad transformation. The slow page, the
+  integration that keeps breaking, the backlog nobody has had time to clear. Narrow and real beats
+  sweeping and vague.
+- Being solo is a real advantage, worth saying plainly where it fits: no agency overhead, direct
+  access to the person writing the code, current frameworks, one project at a time rather than ten.
+  Never a dig at agencies, never a boast.
+- Being early in my career is neither hidden nor apologised for. Specific beats impressive.
+- The resume's numbers ($3M+ monthly, 50,000+ shipments, 60% faster) are the scale of PLATFORMS I
+  worked on as one developer on a team, never results I delivered. "I built the inbound and refunds
+  modules" is true; "I handle $3M+ monthly with end-to-end reconciliation" is not.
+- The catalogue is the authority on which employer each project belongs to. Where it says
+  "Employer: not stated", name the project on its own and invent nothing.
+- One project per message, the most relevant one. Never a list, never a tour of my resume.
+- The only links are my portfolio, hassanmehmood.online, and a "Live:" product URL from the
+  catalogue. Never a repository, never an offer to send code. A link that is in the message has
+  already been sent, so do not also ask permission to send it.
+- What I am asking for is work: are they hiring, do they need a developer, would they look at what
+  I have built. Never a discovery call, an audit, or a strategy conversation."""
 
 ORIGIN_GUIDANCE = {
     "disclosed_need": "They publicly stated a need -- reference their specific stated need directly.",
@@ -81,26 +66,18 @@ POSITION_GUIDANCE = {
         "is the clearest possible sign that a sequence is writing these, not a person."
     ),
     "follow_up": (
-        "I have already sent at least one staged message. This is a follow-up: continue naturally, "
-        "add something new rather than repeating what has already been said, and keep it noticeably "
-        "shorter and lower-effort to read than a first message -- a nudge, not a re-pitch. A "
-        "follow-up that only says 'just following up' gives them nothing to react to. Reference the "
-        "earlier message briefly, bring one genuinely new thing, then one easy question. Repeating "
-        "myself is the fastest way to look automated, so two things must be fresh every time:\n"
-        "  - The HOOK. Do not open on the same detail about them that an earlier message already "
-        "used. If the first message led on a conference talk, this one leads on something else in "
-        "the lead text: a different post, a company update, an open role, an opinion they stated, "
-        "how they describe their team. Read what I already opened with, then pick different "
-        "material.\n"
-        "  - The PROJECT. Never re-use one I have already mentioned in this conversation. Reach for "
-        "a different piece of my background.\n"
-        "  - The CLOSING QUESTION. Do not re-send a question I have already asked. If I have "
-        "already asked who the right person to speak to is, asking it again is nagging, not a "
-        "follow-up.\n"
-        "If the lead text genuinely offers no second angle, say less rather than repeat the first "
-        "one -- a short, honest nudge beats a reworded copy of the previous message.\n"
-        "None of the above applies if THIS MESSAGE'S PURPOSE is a soft close. A close brings no new "
-        "project and no new question at all; the purpose overrides everything here."
+        "I have already sent at least one staged message. This is a follow-up: shorter and lower "
+        "effort to read than a first message, a nudge rather than a re-pitch. 'Just following up' "
+        "gives them nothing to react to, so bring one genuinely new thing, then one easy question. "
+        "Three things must be fresh every time, because repeating myself is what makes a sequence "
+        "look automated:\n"
+        "  - The HOOK. Do not open on a detail an earlier message already used. Read what I opened "
+        "with before, then take a different angle from the lead text: another post, a company "
+        "update, an open role, an opinion they stated, how they describe their team.\n"
+        "  - The PROJECT. Never one already mentioned in this conversation.\n"
+        "  - The CLOSING QUESTION. Never one I have already asked; asking twice is nagging.\n"
+        "If the lead text offers no second angle, say less rather than repeat the first one.\n"
+        "None of this applies to a soft close, where the stage purpose overrides everything here."
     ),
 }
 
@@ -133,6 +110,49 @@ def _cap(text: str, limit: int) -> str:
     return text[:limit] if len(text) > limit else text
 
 
+@dataclass(frozen=True)
+class DraftResult:
+    """A draft plus the evidence of what the checks found, so the caller can record it."""
+
+    body: str
+    first_failures: list[Failure]
+    final_failures: list[Failure]
+    retried: bool
+
+
+def _generate_checked(prompt: str, check: Callable[[str], list[Failure]]) -> DraftResult:
+    """Generate, check the draft against the deterministic rules, and give the model one chance to
+    fix what it broke.
+
+    The prompts already state every rule this checks, and they are followed most of the time but
+    not always -- long prompts leak. One retry costs one extra call only when something is actually
+    wrong, and if the retry is no better we keep whichever draft broke fewer rules rather than
+    failing the request: a flawed draft you can edit beats no draft at all.
+
+    Returns the failures rather than swallowing them: without that record you cannot tell which
+    drafts needed fixing, which rules leak most often, or whether a prompt edit helped.
+    """
+    client = get_llm_client()
+    body = client.generate(system=_COPYWRITER_SYSTEM_PROMPT, user=prompt).strip()
+    failures = check(body)
+    if not failures:
+        return DraftResult(body, [], [], retried=False)
+
+    correction = (
+        f"{prompt}\n\nYou already wrote this draft:\n{body}\n\n"
+        "It breaks rules you were given:\n"
+        + "\n".join(f"- {failure['detail']}" for failure in failures)
+        + "\n\nWrite it again, fixing exactly those problems and changing nothing else. "
+        "Output only the message text."
+    )
+    retry = client.generate(system=_COPYWRITER_SYSTEM_PROMPT, user=correction).strip()
+    retry_failures = check(retry)
+
+    if len(retry_failures) < len(failures):
+        return DraftResult(retry, failures, retry_failures, retried=True)
+    return DraftResult(body, failures, failures, retried=True)
+
+
 def _lead_text(lead: Lead) -> str:
     description = _cap(lead.description, MAX_DESCRIPTION_CHARS)
     return f"Title: {lead.title}\nURL: {lead.url}\nAuthor: {lead.author}\n\n{description}"
@@ -148,7 +168,7 @@ def run_fit_check(lead: Lead) -> tuple[str, str]:
     prompt = load_prompt(
         "fit_check",
         positioning=SELF_POSITIONING,
-        resume_text=get_resume_text(),
+        resume_text=get_skills_text(),
         projects_text=get_projects_text(),
         lead_text=_lead_text(lead),
     )
@@ -161,15 +181,15 @@ def run_fit_check(lead: Lead) -> tuple[str, str]:
     return verdict, reasoning
 
 
-def draft_connection_note(lead: Lead, fit_reasoning: str) -> str:
+def draft_connection_note(lead: Lead, fit_reasoning: str) -> DraftResult:
     prompt = load_prompt(
         "connection_note",
         positioning=SELF_POSITIONING,
-        resume_text=get_resume_text(),
+        resume_text=get_skills_text(),
         lead_text=_lead_text(lead),
         fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS),
     )
-    return get_llm_client().generate(system=_COPYWRITER_SYSTEM_PROMPT, user=prompt).strip()
+    return _generate_checked(prompt, check_connection_note)
 
 
 def draft_next_message(
@@ -179,34 +199,53 @@ def draft_next_message(
     origin_type: str,
     stage_purpose: str,
     message_count: int,
-) -> str:
+    is_soft_close: bool = False,
+) -> DraftResult:
     """Drafts the next message in the post-connection sequence -- covers both the first real
     message and every subsequent follow-up, since they're one continuous sequence (intro ->
     show my work -> direct ask -> soft close), not structurally different
     actions. `message_count` is how many staged messages have already gone out, and is what
     decides first-vs-follow-up -- `thread` may already hold a reply from them even at zero."""
+    lead_text = _lead_text(lead)
+    projects_text = select_projects(
+        get_projects_text(),
+        exclude_mentioned_in="\n".join(m.body for m in thread if m.sender == "me"),
+    )
     prompt = load_prompt(
         "outreach_message",
         positioning=SELF_POSITIONING,
-        resume_text=get_resume_text(),
-        projects_text=get_projects_text(),
-        lead_text=_lead_text(lead),
+        resume_text=get_skills_text(),
+        projects_text=projects_text,
+        lead_text=lead_text,
         fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS),
         origin_guidance=ORIGIN_GUIDANCE.get(origin_type, ORIGIN_GUIDANCE["prospected"]),
         thread_text=_thread_text(thread),
         stage_purpose=stage_purpose,
         position_guidance=POSITION_GUIDANCE["first" if message_count == 0 else "follow_up"],
     )
-    return get_llm_client().generate(system=_COPYWRITER_SYSTEM_PROMPT, user=prompt).strip()
+    return _generate_checked(
+        prompt,
+        lambda body: check_message(
+            body,
+            projects_text=projects_text,
+            previous_me_messages=tuple(m.body for m in thread if m.sender == "me"),
+            is_soft_close=is_soft_close,
+        ),
+    )
 
 
-def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> str:
+def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> DraftResult:
+    lead_text = _lead_text(lead)
+    projects_text = get_projects_text()
     prompt = load_prompt(
         "reply_suggestion",
         positioning=SELF_POSITIONING,
-        resume_text=get_resume_text(),
-        projects_text=get_projects_text(),
-        lead_text=_lead_text(lead),
+        resume_text=get_skills_text(),
+        projects_text=projects_text,
+        lead_text=lead_text,
         thread_text=_thread_text(thread),
     )
-    return get_llm_client().generate(system=_COPYWRITER_SYSTEM_PROMPT, user=prompt).strip()
+    return _generate_checked(
+        prompt,
+        lambda body: check_message(body, projects_text=projects_text),
+    )

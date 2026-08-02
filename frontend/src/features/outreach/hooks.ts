@@ -7,6 +7,7 @@ export const outreachKeys = {
   detail: (id: number) => ['outreach', id] as const,
   byLead: (leadId: number) => ['outreach', 'by-lead', leadId] as const,
   needsNextMessage: (minDaysOverride?: number) => ['outreach', 'needs-next-message', minDaysOverride] as const,
+  checkStats: () => ['outreach', 'check-stats'] as const,
 }
 
 export function useOutreach(id: number) {
@@ -36,6 +37,13 @@ export function useNeedsNextMessage(minDaysOverride?: number) {
   return useQuery({
     queryKey: outreachKeys.needsNextMessage(minDaysOverride),
     queryFn: () => outreachApi.needsNextMessage(minDaysOverride),
+  })
+}
+
+export function useCheckStats() {
+  return useQuery({
+    queryKey: outreachKeys.checkStats(),
+    queryFn: () => outreachApi.checkStats(),
   })
 }
 

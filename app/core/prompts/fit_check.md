@@ -4,10 +4,10 @@ Cold outreach fails for four reasons: mass blasts, generic pitches, no account r
 
 {positioning}
 
-MY BACKGROUND (resume):
+MY TECHNICAL SKILLS:
 {resume_text}
 
-EVERYTHING I HAVE BUILT (full catalogue -- the resume above only lists a few of these; choose from HERE, and follow its attribution and sharing rules):
+EVERYTHING I HAVE BUILT (choose from HERE, and follow its attribution and sharing rules):
 {projects_text}
 
 THE LEAD:

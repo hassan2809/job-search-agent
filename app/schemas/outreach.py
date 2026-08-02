@@ -21,6 +21,24 @@ class OutreachMessageOut(BaseModel):
     sender: str
     body: str
     created_at: datetime
+    # Rules this draft still breaks after the retry. Empty for clean drafts and for anything the
+    # lead sent. Populated from the draft_checks row, so the UI can mark a draft worth editing.
+    check_failures: list[dict] = []
+
+
+class CheckStatRow(BaseModel):
+    code: str
+    first_attempt: int  # times this rule broke on the first draft
+    unresolved: int  # times it survived the retry into the stored draft
+
+
+class CheckStatsOut(BaseModel):
+    drafts: int
+    clean_first_time: int
+    retried: int
+    retry_fixed_all: int
+    still_broken: int
+    by_rule: list[CheckStatRow]
 
 
 class OutreachOut(BaseModel):

@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 from app.models.database import get_db
 from app.models.lead import Lead
 from app.models.match import Match
+from app.models.draft_check import DraftCheck
 from app.models.outreach import Outreach, OutreachMessage
 from app.schemas.outreach import (
+    CheckStatsOut,
+    CheckStatRow,
     CloseIn,
     ConnectionResponseIn,
     MatchOut,
@@ -49,15 +52,19 @@ router = APIRouter()
 MESSAGE_STAGES = [
     {
         "purpose": "Lead with their product, mission or open role and why it genuinely interests "
-        "me. One sentence at most on the part of my background that connects, then an open question",
+        "me. Where their stack or a concrete technical problem is visible in the lead text, name it "
+        "and be specific about the relief I offer rather than promising broad improvement. One "
+        "sentence at most on the part of my background that connects, then an open question",
         "min_days": 3,
     },
     {
-        "purpose": "Go deeper on something specific in their world, and show one thing I have "
-        "built that speaks to it, honestly scoped, with the stack. It must be a DIFFERENT project "
-        "from any already mentioned in the conversation above -- read what has been sent, then pick "
-        "the next most relevant one from my background. Repeating the same project is what makes a "
-        "follow-up feel like a resend. Point at something they can actually check",
+        "purpose": "PROOF POINT. Show one thing I have built that speaks to their situation. I have "
+        "no enterprise case studies, so the proof is speed, a feature owned end to end, or the "
+        "shape of a problem I solved: what was hard about it, how I structured it, what it does "
+        "now. Where the work is client code I cannot show, describe the ARCHITECTURE rather than "
+        "skipping it -- that is proof without breaching anything. It must be a DIFFERENT project "
+        "from any already mentioned in the conversation above; repeating one makes a follow-up feel "
+        "like a resend. Point at something they can actually check",
         "min_days": 5,
     },
     {
@@ -68,10 +75,13 @@ MESSAGE_STAGES = [
     {
         "purpose": "SOFT CLOSE. This is the one message in the sequence that sells nothing and "
         "asks for nothing, and the SHAPE rules do not apply to it. Do NOT name a project. Do NOT "
-        "describe anything I have built. Do NOT include a stack. Do NOT end with a question. The "
-        "whole message is: they were good to connect with, I will leave it here, the door is open "
-        "if anything comes up later. Two or three sentences, warm and final. My portfolio link may "
-        "appear once at the end, plainly, and nothing else. If it reads like a pitch, it is wrong",
+        "describe anything I have built. Do NOT include a stack. Do NOT end with a question. "
+        "Assume the timing simply isn't right, say so without a hint of grievance, and leave one "
+        "concrete standing offer: if they ever hit a tight deadline or need an extra pair of hands "
+        "to clear a backlog, I am around. Being someone's on-call backup developer is a smaller and "
+        "more useful thing to be remembered for than being someone who wanted a job. Two or three "
+        "sentences, warm and final. My portfolio link may appear once at the end, plainly, and "
+        "nothing else. If it reads like a pitch, it is wrong",
         "min_days": 7,
     },
 ]
@@ -111,15 +121,49 @@ def _require_status(outreach: Outreach, expected: str) -> None:
 
 
 def _thread(outreach_id: int, db: Session) -> list[OutreachMessage]:
-    return list(
+    messages = list(
         db.execute(
             select(OutreachMessage).where(OutreachMessage.outreach_id == outreach_id).order_by(OutreachMessage.created_at)
         ).scalars()
     )
+    # Attach whatever each draft still breaks, so the UI can flag it. One query for the thread
+    # rather than one per message.
+    unresolved = {
+        row.message_id: row.final_failures
+        for row in db.execute(
+            select(DraftCheck).where(DraftCheck.outreach_id == outreach_id, DraftCheck.message_id.isnot(None))
+        ).scalars()
+        if row.final_failures
+    }
+    for message in messages:
+        message.check_failures = unresolved.get(message.id, [])  # type: ignore[attr-defined]
+    return messages
 
 
 def _detail(outreach: Outreach, db: Session) -> OutreachDetailOut:
     return OutreachDetailOut(**OutreachOut.model_validate(outreach).model_dump(), messages=_thread(outreach.id, db))
+
+
+def _record_check(
+    db: Session, outreach_id: int, message_id: int, kind: str, stage_index: int | None, draft
+) -> None:
+    """Record what the checks found for one generated draft.
+
+    Written for every draft, clean or not: a run with no failures is the baseline that makes the
+    failure counts meaningful. Without the clean rows you can count how often a rule broke but not
+    how often it held.
+    """
+    db.add(
+        DraftCheck(
+            outreach_id=outreach_id,
+            message_id=message_id,
+            kind=kind,
+            stage_index=stage_index,
+            first_failures=draft.first_failures,
+            final_failures=draft.final_failures,
+            retried=draft.retried,
+        )
+    )
 
 
 @router.post("/{lead_id}/fit-check", response_model=MatchOut)
@@ -170,7 +214,7 @@ def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=409, detail="Fit-check verdict is 'not_a_fit' -- not sending a connection request")
 
     try:
-        note = outreach_service.draft_connection_note(lead, latest_match.fit_reasoning)
+        draft = outreach_service.draft_connection_note(lead, latest_match.fit_reasoning)
     except LLMNotConfiguredError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
@@ -179,7 +223,10 @@ def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) ->
     )
     db.add(new_outreach)
     db.flush()
-    db.add(OutreachMessage(outreach_id=new_outreach.id, sender="me", body=note))
+    message = OutreachMessage(outreach_id=new_outreach.id, sender="me", body=draft.body)
+    db.add(message)
+    db.flush()
+    _record_check(db, new_outreach.id, message.id, "connection_note", None, draft)
     db.commit()
     db.refresh(new_outreach)
     return _detail(new_outreach, db)
@@ -286,18 +333,22 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
     stage_purpose = MESSAGE_STAGES[outreach.message_count]["purpose"]
 
     try:
-        message_body = outreach_service.draft_next_message(
+        draft = outreach_service.draft_next_message(
             lead,
             _thread(outreach.id, db),
             fit_reasoning,
             outreach.origin_type,
             stage_purpose,
             outreach.message_count,
+            is_soft_close=outreach.message_count == MAX_MESSAGE_STAGES - 1,
         )
     except LLMNotConfiguredError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    db.add(OutreachMessage(outreach_id=outreach.id, sender="me", body=message_body))
+    message = OutreachMessage(outreach_id=outreach.id, sender="me", body=draft.body)
+    db.add(message)
+    db.flush()
+    _record_check(db, outreach.id, message.id, "staged_message", outreach.message_count, draft)
     outreach.message_count += 1
     outreach.status = "message_drafted"
     db.commit()
@@ -339,12 +390,15 @@ def reply(id: int, reply_in: ReplyIn, db: Session = Depends(get_db)) -> Outreach
     db.flush()
 
     try:
-        suggestion = outreach_service.suggest_reply(lead, _thread(outreach.id, db))
+        draft = outreach_service.suggest_reply(lead, _thread(outreach.id, db))
     except LLMNotConfiguredError as e:
         db.commit()
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    db.add(OutreachMessage(outreach_id=outreach.id, sender="me", body=suggestion))
+    message = OutreachMessage(outreach_id=outreach.id, sender="me", body=draft.body)
+    db.add(message)
+    db.flush()
+    _record_check(db, outreach.id, message.id, "reply_suggestion", None, draft)
     db.commit()
     db.refresh(outreach)
     return _detail(outreach, db)
@@ -406,6 +460,41 @@ def needs_next_message(min_days_override: int | None = None, db: Session = Depen
         )
 
     return due
+
+
+@router.get("/check-stats", response_model=CheckStatsOut)
+def check_stats(db: Session = Depends(get_db)) -> CheckStatsOut:
+    """How often the deterministic checks fire, and whether the retry fixes them.
+
+    This is the question the checks exist to answer: which prompt rules keep leaking. `first_attempt`
+    counts every time a rule broke on the first draft -- including the ones the retry then fixed,
+    which is why the failures are recorded per attempt rather than only on the stored message.
+    A rule with a high first_attempt count is a prompt that isn't landing; a high `unresolved`
+    count means the retry can't fix it either and the rule needs a different approach.
+    """
+    rows = list(db.execute(select(DraftCheck)).scalars())
+    first_counts: dict[str, int] = {}
+    unresolved_counts: dict[str, int] = {}
+    for row in rows:
+        for failure in row.first_failures or []:
+            code = failure.get("code", "unknown")
+            first_counts[code] = first_counts.get(code, 0) + 1
+        for failure in row.final_failures or []:
+            code = failure.get("code", "unknown")
+            unresolved_counts[code] = unresolved_counts.get(code, 0) + 1
+
+    by_rule = [
+        CheckStatRow(code=code, first_attempt=count, unresolved=unresolved_counts.get(code, 0))
+        for code, count in sorted(first_counts.items(), key=lambda kv: -kv[1])
+    ]
+    return CheckStatsOut(
+        drafts=len(rows),
+        clean_first_time=sum(1 for r in rows if not r.first_failures),
+        retried=sum(1 for r in rows if r.retried),
+        retry_fixed_all=sum(1 for r in rows if r.retried and not r.final_failures),
+        still_broken=sum(1 for r in rows if r.final_failures),
+        by_rule=by_rule,
+    )
 
 
 @router.get("/{id}", response_model=OutreachDetailOut)
