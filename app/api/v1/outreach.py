@@ -19,6 +19,7 @@ from app.schemas.outreach import (
     OutreachDetailOut,
     OutreachOut,
     ReplyIn,
+    ReviseIn,
 )
 from app.services import outreach as outreach_service
 from app.services.llm.client import LLMNotConfiguredError
@@ -128,13 +129,18 @@ def _thread(outreach_id: int, db: Session) -> list[OutreachMessage]:
     )
     # Attach whatever each draft still breaks, so the UI can flag it. One query for the thread
     # rather than one per message.
-    unresolved = {
-        row.message_id: row.final_failures
-        for row in db.execute(
-            select(DraftCheck).where(DraftCheck.outreach_id == outreach_id, DraftCheck.message_id.isnot(None))
-        ).scalars()
-        if row.final_failures
-    }
+    #
+    # A revised message has more than one check row, so order by time and let the newest win: a
+    # revision that fixed the problem must clear the warning, which means a clean row has to
+    # overwrite an earlier failing one rather than being skipped.
+    unresolved: dict[int, list] = {}
+    for row in db.execute(
+        select(DraftCheck)
+        .where(DraftCheck.outreach_id == outreach_id, DraftCheck.message_id.isnot(None))
+        .order_by(DraftCheck.created_at)
+    ).scalars():
+        unresolved[row.message_id] = row.final_failures or []
+
     for message in messages:
         message.check_failures = unresolved.get(message.id, [])  # type: ignore[attr-defined]
     return messages
@@ -364,6 +370,58 @@ def mark_sent(id: int, db: Session = Depends(get_db)) -> Outreach:
     db.commit()
     db.refresh(outreach)
     return outreach
+
+
+@router.post("/{id}/messages/{message_id}/revise", response_model=OutreachDetailOut)
+def revise_message(
+    id: int, message_id: int, revise_in: ReviseIn, db: Session = Depends(get_db)
+) -> OutreachDetailOut:
+    """Rewrite one drafted message in place, following a free-text instruction.
+
+    Edits the existing message rather than appending a new one: a revision is the same message said
+    better, and stacking every attempt in the thread would poison the context that later drafts read
+    ("never re-use a project" would see its own discarded attempts).
+    """
+    outreach = _get_outreach_or_404(id, db)
+    instruction = revise_in.instruction.strip()
+    if not instruction:
+        raise HTTPException(status_code=400, detail="instruction cannot be empty")
+
+    message = db.get(OutreachMessage, message_id)
+    if not message or message.outreach_id != outreach.id:
+        raise HTTPException(status_code=404, detail="Message not found on this outreach")
+    if message.sender != "me":
+        raise HTTPException(status_code=409, detail="Can only revise your own drafts, not their replies")
+
+    lead = _get_lead_or_404(outreach.lead_id, db)
+    # Everything except the draft under revision -- it is passed separately.
+    thread = [m for m in _thread(outreach.id, db) if m.id != message.id]
+
+    # A revision of the last staged message inherits that stage's rules, so the soft close stays a
+    # soft close. Recovered from the check row that recorded how this draft was first generated.
+    origin = db.execute(
+        select(DraftCheck).where(DraftCheck.message_id == message.id).order_by(DraftCheck.created_at.desc())
+    ).scalars().first()
+    is_soft_close = bool(origin and origin.stage_index == MAX_MESSAGE_STAGES - 1)
+
+    try:
+        draft = outreach_service.revise_message(
+            lead, thread, message.body, instruction, is_soft_close=is_soft_close
+        )
+    except LLMNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    message.body = draft.body
+    _record_check(
+        db,
+        outreach.id,
+        message.id,
+        "revision",
+        origin.stage_index if origin else None,
+        draft,
+    )
+    db.commit()
+    return _detail(outreach, db)
 
 
 @router.post("/{id}/mark-reply-sent", response_model=OutreachOut)

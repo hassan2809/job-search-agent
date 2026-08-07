@@ -29,6 +29,10 @@ export const outreachApi = {
   // Records that the suggested response was actually sent -- returns the thread to awaiting_reply.
   markReplySent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-reply-sent`),
 
+  // Rewrites one drafted message in place, following a free-text instruction.
+  revise: (id: number, messageId: number, instruction: string) =>
+    api.post<OutreachDetailOut>(`/outreach/${id}/messages/${messageId}/revise`, { instruction }),
+
   close: (id: number, status: CloseStatus) => api.post<OutreachOut>(`/outreach/${id}/close`, { status }),
 
   needsNextMessage: (minDaysOverride?: number) =>

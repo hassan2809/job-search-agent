@@ -80,7 +80,7 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
     return (
       <div className="flex flex-col gap-3">
         <Badge variant="secondary">{outreach.status}</Badge>
-        <MessageThread messages={outreach.messages} />
+        <MessageThread messages={outreach.messages} outreachId={outreach.id} />
       </div>
     )
   }
@@ -98,7 +98,7 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
 
       <ActionNotice outreach={outreach} />
 
-      <MessageThread messages={outreach.messages} />
+      <MessageThread messages={outreach.messages} outreachId={outreach.id} />
 
       {outreach.status === 'connection_drafted' && (
         <div className="flex flex-col gap-2">

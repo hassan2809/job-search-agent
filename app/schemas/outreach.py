@@ -71,5 +71,9 @@ class ReplyIn(BaseModel):
     body: str  # a single new message, or a full pasted thread to sync retroactively
 
 
+class ReviseIn(BaseModel):
+    instruction: str
+
+
 class CloseIn(BaseModel):
     status: str  # closed_won | closed_declined | closed_no_response | closed_not_interested

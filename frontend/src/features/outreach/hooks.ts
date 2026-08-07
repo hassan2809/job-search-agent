@@ -142,6 +142,19 @@ export function useMarkReplySent() {
   })
 }
 
+export function useReviseMessage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, messageId, instruction }: { id: number; messageId: number; instruction: string }) =>
+      outreachApi.revise(id, messageId, instruction),
+    onSuccess: (data) => {
+      queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
+      queryClient.invalidateQueries({ queryKey: outreachKeys.checkStats() })
+    },
+  })
+}
+
 export function useCloseOutreach() {
   const queryClient = useQueryClient()
   return useMutation({
