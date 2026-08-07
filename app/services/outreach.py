@@ -95,10 +95,12 @@ end-to-end, human-in-the-loop) are fine and should be left alone. Note that the 
 double hyphens in its own instructions; that is formatting for you, never a licence to use dashes \
 in the message you write.
 
-2. When referring to work he has built, point at something the reader can actually CHECK, not just \
-a description: his portfolio at hassanmehmood.online, or the live site of a product he worked on. \
-Verifiable beats impressive. NEVER link a code repository and never offer to send code. No \
-github.com links of any kind, regardless of whether a repo is public.
+2. This governs WHICH links may appear, not whether one must. The only links permitted are his \
+portfolio at hassanmehmood.online and the live site of a product he worked on. NEVER link a code \
+repository and never offer to send code, no github.com links of any kind, regardless of whether a \
+repo is public. It is entirely fine for a message to contain no link at all: do not reach for the \
+portfolio out of habit, and never repeat a link the conversation already contains. If the user's \
+instruction says to leave a link out, that wins over everything here.
 
 Output only the message text itself. No preamble, no subject line, no explanation."""
 MAX_DESCRIPTION_CHARS = 12_000
@@ -234,6 +236,43 @@ def draft_next_message(
     )
 
 
+def revise_message(
+    lead: Lead,
+    thread: list[OutreachMessage],
+    current_draft: str,
+    instruction: str,
+    *,
+    is_soft_close: bool = False,
+) -> DraftResult:
+    """Re-run one existing draft with a human instruction applied ("drop the last line", "shorter").
+
+    `thread` must exclude the draft being revised -- it is passed separately, and showing it twice
+    invites the model to treat its own text as part of the conversation.
+
+    The checks still run. An instruction can legitimately override a prompt rule (the prompt says
+    so), but it cannot quietly reintroduce an em dash or a repo link, so those stay enforced.
+    """
+    projects_text = get_projects_text()
+    prompt = load_prompt(
+        "revise_message",
+        positioning=SELF_POSITIONING,
+        resume_text=get_skills_text(),
+        projects_text=projects_text,
+        lead_text=_lead_text(lead),
+        thread_text=_thread_text(thread),
+        current_draft=current_draft,
+        instruction=instruction.strip(),
+    )
+    # Deliberately no `previous_me_messages`: the repeated-project rule exists to stop a follow-up
+    # recycling material, but a revision is the SAME message said differently, so its project is
+    # already in the thread by definition. Passing them made "make it shorter" trip the rule and the
+    # retry "fixed" it by silently swapping to a different project, which is not what was asked.
+    return _generate_checked(
+        prompt,
+        lambda body: check_message(body, projects_text=projects_text, is_soft_close=is_soft_close),
+    )
+
+
 def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> DraftResult:
     lead_text = _lead_text(lead)
     projects_text = get_projects_text()
@@ -245,7 +284,14 @@ def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> DraftResult:
         lead_text=lead_text,
         thread_text=_thread_text(thread),
     )
+    # Repeated-project is off here: if they asked about a project by name, naming it back is the
+    # answer. Repeated-portfolio stays on -- they already have the link.
     return _generate_checked(
         prompt,
-        lambda body: check_message(body, projects_text=projects_text),
+        lambda body: check_message(
+            body,
+            projects_text=projects_text,
+            previous_me_messages=tuple(m.body for m in thread if m.sender == "me"),
+            check_repeated_project=False,
+        ),
     )

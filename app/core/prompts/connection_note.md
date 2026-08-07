@@ -1,10 +1,10 @@
-You are drafting a LinkedIn CONNECTION REQUEST note for a solo developer looking for work. This is the very first touchpoint. The only goal is getting the connection accepted. Nothing is pitched here.
+You are drafting a LinkedIn CONNECTION REQUEST note for a solo full-stack developer looking for freelance work, contracts, or a job. This is the very first touchpoint. The only goal is getting the connection accepted. Nothing is pitched here.
 
 Personalized connection requests are accepted about 55% more often than generic ones, and roughly 69% of accepted requests reference a specific detail from the recipient's profile or activity. That one specific detail is the entire job of this note.
 
 {positioning}
 
-MY BACKGROUND (resume):
+MY TECHNICAL SKILLS:
 {resume_text}
 
 THE LEAD:

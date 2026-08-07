@@ -69,6 +69,9 @@ def _projects_mentioned(body: str, projects: dict[str, str | None]) -> list[str]
     return [name for name in projects if re.search(rf"\b{re.escape(name)}\b", body, re.IGNORECASE)]
 
 
+PORTFOLIO_URL = "hassanmehmood.online"
+
+
 def check_message(
     body: str,
     *,
@@ -76,6 +79,7 @@ def check_message(
     previous_me_messages: tuple[str, ...] = (),
     is_soft_close: bool = False,
     max_words: int = MAX_MESSAGE_WORDS,
+    check_repeated_project: bool = True,
 ) -> list[Failure]:
     """Returns one failure per broken rule, empty when the draft is clean."""
     failures: list[Failure] = []
@@ -106,6 +110,17 @@ def check_message(
         if phrase in lowered:
             failures.append(_fail("banned_phrase", f'Uses the banned phrase "{phrase}".'))
 
+    # They already have the link. Re-sending it every message is the clearest sign nobody read the
+    # conversation, and it is what makes a thread feel like a loop rather than an exchange.
+    if PORTFOLIO_URL in lowered and any(PORTFOLIO_URL in prior.lower() for prior in previous_me_messages):
+        failures.append(
+            _fail(
+                "repeated_portfolio",
+                "Sends the portfolio link again, but it is already earlier in this conversation. "
+                "Drop it.",
+            )
+        )
+
     projects = parse_catalogue(projects_text) if projects_text else {}
     mentioned = _projects_mentioned(body, projects)
 
@@ -122,7 +137,10 @@ def check_message(
                     f"This is the soft close, so it must not name a project (found: {', '.join(mentioned)}).",
                 )
             )
-    else:
+    elif check_repeated_project:
+        # Off for replies: if they asked about a project by name, naming it back is the correct
+        # answer, not a repetition. It stays on for staged messages, where recycling material is
+        # exactly what makes a follow-up feel like a resend.
         already_used = [
             name
             for name in mentioned
