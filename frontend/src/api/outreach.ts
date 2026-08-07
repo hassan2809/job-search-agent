@@ -4,6 +4,7 @@ import type {
   CloseStatus,
   MatchOut,
   NeedsNextMessageOut,
+  PendingConnectionOut,
   OutreachDetailOut,
   OutreachOut,
 } from './types'
@@ -39,6 +40,9 @@ export const outreachApi = {
     api.get<NeedsNextMessageOut[]>(
       `/outreach/needs-next-message${minDaysOverride !== undefined ? `?min_days_override=${minDaysOverride}` : ''}`,
     ),
+
+  // Connection requests sent but never resolved -- the hole in the funnel.
+  pendingConnections: () => api.get<PendingConnectionOut[]>('/outreach/pending-connections'),
 
   // How often the deterministic draft checks fire, and whether the automatic retry fixes them.
   checkStats: () => api.get<CheckStatsOut>('/outreach/check-stats'),

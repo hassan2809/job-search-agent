@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -9,19 +10,27 @@ from app.models.lead import Lead
 from app.models.match import Match
 from app.models.draft_check import DraftCheck
 from app.models.outreach import Outreach, OutreachMessage
+from app.models.reflection import Reflection
 from app.schemas.outreach import (
     CheckStatsOut,
     CheckStatRow,
     CloseIn,
     ConnectionResponseIn,
+    EpisodeOut,
+    EpisodesOut,
     MatchOut,
     NeedsNextMessageOut,
     OutreachDetailOut,
     OutreachOut,
+    PendingConnectionOut,
+    ReflectionOut,
     ReplyIn,
     ReviseIn,
 )
+from app.services import episodes as episode_service
 from app.services import outreach as outreach_service
+from app.services.message_checks import parse_catalogue
+from app.services.resume import get_projects_text
 from app.services.llm.client import LLMNotConfiguredError
 
 router = APIRouter()
@@ -187,11 +196,11 @@ def fit_check(lead_id: int, force: bool = False, db: Session = Depends(get_db)) 
             return existing
 
     try:
-        verdict, reasoning = outreach_service.run_fit_check(lead)
+        verdict, reasoning, lead_type = outreach_service.run_fit_check(lead)
     except LLMNotConfiguredError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    match = Match(lead_id=lead.id, fit_verdict=verdict, fit_reasoning=reasoning)
+    match = Match(lead_id=lead.id, fit_verdict=verdict, fit_reasoning=reasoning, lead_type=lead_type)
     db.add(match)
     db.commit()
     db.refresh(match)
@@ -338,6 +347,17 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
     fit_reasoning = match.fit_reasoning if match else ""
     stage_purpose = MESSAGE_STAGES[outreach.message_count]["purpose"]
 
+    # Recall: what happened with leads like this one, plus whatever the stored reflection
+    # concluded. Both degrade to an explicit "nothing yet" rather than being omitted, so the
+    # model is never left guessing whether history was withheld or simply does not exist.
+    all_episodes = episode_service.build_episodes(db)
+    similar = episode_service.retrieve_similar(
+        all_episodes,
+        lead_type=match.lead_type if match else None,
+        origin_type=outreach.origin_type,
+    )
+    reflection = db.execute(select(Reflection).order_by(Reflection.created_at.desc())).scalars().first()
+
     try:
         draft = outreach_service.draft_next_message(
             lead,
@@ -347,6 +367,8 @@ def next_message(id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
             stage_purpose,
             outreach.message_count,
             is_soft_close=outreach.message_count == MAX_MESSAGE_STAGES - 1,
+            past_outreach=episode_service.as_recall_text(similar),
+            learned_guidance=reflection.guidance if reflection else "",
         )
     except LLMNotConfiguredError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -518,6 +540,84 @@ def needs_next_message(min_days_override: int | None = None, db: Session = Depen
         )
 
     return due
+
+
+@router.get("/pending-connections", response_model=list[PendingConnectionOut])
+def pending_connections(db: Session = Depends(get_db)) -> list[PendingConnectionOut]:
+    """Connection requests sent but never resolved, oldest first.
+
+    This is the hole in the funnel. Every later measurement -- reply rate, which lead types work,
+    whether a hook lands -- depends on knowing whether the connection was accepted, and that is the
+    one fact only a human can supply. An outreach parked at 'connection_sent' is not just waiting,
+    it is a data point that never gets recorded.
+    """
+    now = datetime.now(timezone.utc)
+    rows = []
+    for outreach in db.execute(
+        select(Outreach).where(Outreach.status == "connection_sent").order_by(Outreach.created_at)
+    ).scalars():
+        lead = db.get(Lead, outreach.lead_id)
+        sent_at = outreach.updated_at.replace(tzinfo=timezone.utc)
+        rows.append(
+            PendingConnectionOut(
+                id=outreach.id,
+                lead_id=outreach.lead_id,
+                lead_author=lead.author if lead else "",
+                lead_title=lead.title if lead else "",
+                days_waiting=max((now - sent_at).days, 0),
+            )
+        )
+    return rows
+
+
+@router.get("/episodes", response_model=EpisodesOut)
+def episodes(db: Session = Depends(get_db)) -> EpisodesOut:
+    """Every past outreach as an episode, plus counts. Derived on read, nothing stored."""
+    built = episode_service.build_episodes(
+        db, project_names=tuple(parse_catalogue(get_projects_text()))
+    )
+    return EpisodesOut(
+        summary=episode_service.summarise(built),
+        episodes=[EpisodeOut(**vars(e)) for e in built],
+    )
+
+
+@router.post("/reflections/generate", response_model=ReflectionOut)
+def generate_reflection(db: Session = Depends(get_db)) -> Reflection:
+    """Distil every closed episode into guidance, and store it for injection into future drafts.
+
+    Gated on episode count. Below the threshold this returns 409 rather than a weak reflection:
+    guidance learned from five episodes would be indistinguishable in tone from guidance learned
+    from five hundred, and it gets injected into every message either way.
+    """
+    built = episode_service.build_episodes(db, project_names=tuple(parse_catalogue(get_projects_text())))
+    summary = episode_service.summarise(built)
+    closed = summary["with_known_outcome"]
+    if closed < episode_service.MIN_EPISODES_FOR_REFLECTION:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Only {closed} outreaches have a known outcome; {episode_service.MIN_EPISODES_FOR_REFLECTION} "
+            "are needed before a reflection means anything. Resolve pending connection requests to "
+            "close the loop faster.",
+        )
+
+    try:
+        guidance = outreach_service.generate_reflection(
+            episode_service.episodes_as_text(built), json.dumps(summary, indent=2)
+        )
+    except LLMNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    reflection = Reflection(episode_count=closed, guidance=guidance)
+    db.add(reflection)
+    db.commit()
+    db.refresh(reflection)
+    return reflection
+
+
+@router.get("/reflections", response_model=ReflectionOut | None)
+def latest_reflection(db: Session = Depends(get_db)) -> Reflection | None:
+    return db.execute(select(Reflection).order_by(Reflection.created_at.desc())).scalars().first()
 
 
 @router.get("/check-stats", response_model=CheckStatsOut)

@@ -7,10 +7,13 @@ from app.models.lead import Lead
 from app.models.outreach import OutreachMessage
 from app.services.llm.client import get_llm_client
 from app.services.message_checks import Failure, check_connection_note, check_message
-from app.services.resume import get_projects_text, get_skills_text, select_projects
+from app.services.resume import get_projects_text, get_skills_text, projects_index, select_projects
 
 VERDICT_PATTERN = re.compile(r"VERDICT:\s*(good_fit|maybe|not_a_fit)", re.IGNORECASE)
 REASONING_PATTERN = re.compile(r"REASONING:\s*(.+)", re.IGNORECASE | re.DOTALL)
+LEAD_TYPE_PATTERN = re.compile(
+    r"LEAD_TYPE:\s*(builds_software|sells_services|recruiter|creator|other)", re.IGNORECASE
+)
 
 # Injected into every prompt. The resume alone doesn't say what I'm doing on LinkedIn, so without
 # this the model reads big platform numbers off it and writes as though I were an agency selling
@@ -84,7 +87,7 @@ POSITION_GUIDANCE = {
 # These two rules kept getting ignored as bullets near the end of a long user prompt, so they live
 # here instead -- system position carries far more weight, and all three copy prompts share it.
 _COPYWRITER_SYSTEM_PROMPT = """You are a concise, specific outreach copywriter writing on behalf of \
-one solo developer looking for work. Relevance over volume.
+one solo full-stack developer looking for freelance work, contracts, or a job. Relevance over volume.
 
 Two rules override everything else in the user message:
 
@@ -166,21 +169,30 @@ def _thread_text(thread: list[OutreachMessage]) -> str:
     )
 
 
-def run_fit_check(lead: Lead) -> tuple[str, str]:
+def run_fit_check(lead: Lead) -> tuple[str, str, str | None]:
     prompt = load_prompt(
         "fit_check",
         positioning=SELF_POSITIONING,
         resume_text=get_skills_text(),
-        projects_text=get_projects_text(),
+        # The index, not the full catalogue: this decides whether a lead is worth approaching,
+        # which needs the shape of what he has built, never the build detail.
+        projects_text=projects_index(get_projects_text()),
         lead_text=_lead_text(lead),
     )
     response = get_llm_client().generate(system="You are a precise, honest fit-assessment assistant.", user=prompt)
 
     verdict_match = VERDICT_PATTERN.search(response)
     reasoning_match = REASONING_PATTERN.search(response)
+    lead_type_match = LEAD_TYPE_PATTERN.search(response)
     verdict = verdict_match.group(1).lower() if verdict_match else "maybe"
+    # REASONING is captured DOTALL to the end, so strip a LEAD_TYPE line that follows it rather
+    # than swallowing it into the prose the UI shows.
     reasoning = reasoning_match.group(1).strip() if reasoning_match else response.strip()
-    return verdict, reasoning
+    reasoning = LEAD_TYPE_PATTERN.sub("", reasoning).strip()
+    # None rather than a guess when the model omits it: an unknown type should read as unknown, not
+    # be silently bucketed as "other" and then counted as evidence in episode grouping.
+    lead_type = lead_type_match.group(1).lower() if lead_type_match else None
+    return verdict, reasoning, lead_type
 
 
 def draft_connection_note(lead: Lead, fit_reasoning: str) -> DraftResult:
@@ -202,6 +214,8 @@ def draft_next_message(
     stage_purpose: str,
     message_count: int,
     is_soft_close: bool = False,
+    past_outreach: str = "",
+    learned_guidance: str = "",
 ) -> DraftResult:
     """Drafts the next message in the post-connection sequence -- covers both the first real
     message and every subsequent follow-up, since they're one continuous sequence (intro ->
@@ -224,6 +238,8 @@ def draft_next_message(
         thread_text=_thread_text(thread),
         stage_purpose=stage_purpose,
         position_guidance=POSITION_GUIDANCE["first" if message_count == 0 else "follow_up"],
+        past_outreach=past_outreach or "No comparable past outreach yet. Ignore this section.",
+        learned_guidance=learned_guidance or "Nothing learned yet: too few outreaches have a known outcome.",
     )
     return _generate_checked(
         prompt,
@@ -234,6 +250,18 @@ def draft_next_message(
             is_soft_close=is_soft_close,
         ),
     )
+
+
+def generate_reflection(episodes_text: str, summary_text: str) -> str:
+    """Distil what past outreach taught into guidance for future drafts.
+
+    Not run through _generate_checked: the output is internal guidance for the prompts, not a
+    message to a human, so none of the message rules (word count, links, dashes) apply to it.
+    """
+    prompt = load_prompt("reflection", episodes_text=episodes_text, summary_text=summary_text)
+    return get_llm_client().generate(
+        system="You are a careful analyst. You never claim more than the data supports.", user=prompt
+    ).strip()
 
 
 def revise_message(
@@ -252,7 +280,9 @@ def revise_message(
     The checks still run. An instruction can legitimately override a prompt rule (the prompt says
     so), but it cannot quietly reintroduce an em dash or a repo link, so those stay enforced.
     """
-    projects_text = get_projects_text()
+    # Index only: a revision keeps whichever project the draft already names, so it needs the
+    # attribution and sharing rules but never the build detail of fourteen other projects.
+    projects_text = projects_index(get_projects_text())
     prompt = load_prompt(
         "revise_message",
         positioning=SELF_POSITIONING,

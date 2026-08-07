@@ -9,6 +9,7 @@ class MatchOut(BaseModel):
     id: int
     lead_id: int
     fit_verdict: str
+    lead_type: str | None = None
     fit_reasoning: str
     created_at: datetime
 
@@ -69,6 +70,46 @@ class ConnectionResponseIn(BaseModel):
 
 class ReplyIn(BaseModel):
     body: str  # a single new message, or a full pasted thread to sync retroactively
+
+
+class EpisodeOut(BaseModel):
+    outreach_id: int
+    lead_id: int
+    lead_author: str
+    lead_type: str | None
+    fit_verdict: str | None
+    origin_type: str
+    status: str
+    outcome: str
+    connection_accepted: bool | None
+    stages_sent: int
+    got_reply: bool
+    days_to_first_reply: int | None
+    hook: str
+    projects_mentioned: list[str]
+    unresolved_failures: int
+
+
+class EpisodesOut(BaseModel):
+    summary: dict
+    episodes: list[EpisodeOut]
+
+
+class ReflectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    episode_count: int
+    guidance: str
+    created_at: datetime
+
+
+class PendingConnectionOut(BaseModel):
+    id: int
+    lead_id: int
+    lead_author: str
+    lead_title: str
+    days_waiting: int
 
 
 class ReviseIn(BaseModel):

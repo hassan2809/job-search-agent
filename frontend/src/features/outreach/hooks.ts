@@ -8,6 +8,7 @@ export const outreachKeys = {
   byLead: (leadId: number) => ['outreach', 'by-lead', leadId] as const,
   needsNextMessage: (minDaysOverride?: number) => ['outreach', 'needs-next-message', minDaysOverride] as const,
   checkStats: () => ['outreach', 'check-stats'] as const,
+  pendingConnections: () => ['outreach', 'pending-connections'] as const,
 }
 
 export function useOutreach(id: number) {
@@ -37,6 +38,13 @@ export function useNeedsNextMessage(minDaysOverride?: number) {
   return useQuery({
     queryKey: outreachKeys.needsNextMessage(minDaysOverride),
     queryFn: () => outreachApi.needsNextMessage(minDaysOverride),
+  })
+}
+
+export function usePendingConnections() {
+  return useQuery({
+    queryKey: outreachKeys.pendingConnections(),
+    queryFn: () => outreachApi.pendingConnections(),
   })
 }
 
@@ -94,6 +102,7 @@ export function useConnectionResponse() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: outreachKeys.detail(data.id) })
       queryClient.invalidateQueries({ queryKey: outreachKeys.byLead(data.lead_id) })
+      queryClient.invalidateQueries({ queryKey: outreachKeys.pendingConnections() })
     },
   })
 }

@@ -61,6 +61,7 @@ export interface MatchOut {
   id: number
   lead_id: number
   fit_verdict: FitVerdict
+  lead_type: string | null
   fit_reasoning: string
   created_at: string
 }
@@ -81,6 +82,14 @@ export interface OutreachMessageOut {
   // Rules this draft STILL breaks after the automatic retry. Empty for clean drafts, for messages
   // they sent, and for anything drafted before checks existed.
   check_failures: CheckFailure[]
+}
+
+export interface PendingConnectionOut {
+  id: number
+  lead_id: number
+  lead_author: string
+  lead_title: string
+  days_waiting: number
 }
 
 export interface CheckStatRow {

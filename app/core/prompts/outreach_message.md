@@ -29,6 +29,14 @@ THIS MESSAGE'S PURPOSE: {stage_purpose}
 
 WHERE THIS SITS IN THE SEQUENCE: {position_guidance}
 
+WHAT HAPPENED WITH SIMILAR LEADS BEFORE (same kind of lead, found the same way):
+{past_outreach}
+
+WHAT PAST OUTREACH TAUGHT:
+{learned_guidance}
+
+Use those two sections as evidence, not as a template. Never copy an opening that worked before: the same words to a different person is exactly what makes outreach feel automated, and the lesson is in WHY it worked, not in the wording. Where they show an approach got no reply, do something different. Where the sample is small or absent, ignore them entirely and write the message on its own merits.
+
 1. THE HOOK. Read ALL the lead text first; the strongest hook is usually further down. Reaching out for a real reason beats better copy: they are hiring, they shipped or raised, they changed roles, or they described a problem I work on. An open ENGINEERING role is the strongest hook there is. If the only open roles are product, design or sales, do not lead with them and do not pretend to be a candidate for them.
 
 2. THE SHAPE. Governs everything below it. Skip this section entirely if the purpose above is a soft close.

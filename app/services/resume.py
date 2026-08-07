@@ -49,6 +49,28 @@ def get_skills_text() -> str:
     return "Technical Skills\n" + (rest[: end.start()] if end else rest).strip()
 
 
+_DETAIL_PREFIXES = ("Built:", "Scale note:", "Relevance note:")
+
+
+def projects_index(projects_text: str) -> str:
+    """The catalogue with the build detail stripped: name, employer, tags, one-line description.
+
+    Not every prompt needs the whole thing. Deciding whether a lead is worth approaching only needs
+    to know WHAT he has built and roughly in what domain; the paragraph on how each module was
+    structured informs nothing about that lead and costs a few thousand tokens on every call.
+    Prompts that actually describe a project to someone still get the full catalogue.
+    """
+    if not projects_text:
+        return projects_text
+    kept = [
+        line
+        for line in projects_text.splitlines()
+        # Continuation lines of a stripped paragraph are indented; drop those with their heading.
+        if not line.startswith(_DETAIL_PREFIXES) and not line.startswith("  ")
+    ]
+    return "\n".join(kept)
+
+
 def select_projects(projects_text: str, *, exclude_mentioned_in: str = "") -> str:
     """Drop projects already used in this thread, and send the rest.
 

@@ -61,5 +61,13 @@ maybe for everything else. maybe means "real but unproven", and it is the honest
 Be specific and be willing to disappoint. If the honest answer is that this is a stranger with a nice title and no visible need, say so.
 
 Respond in exactly this format, nothing else:
+LEAD_TYPE: builds_software|sells_services|recruiter|creator|other
 VERDICT: good_fit|maybe|not_a_fit
-REASONING: <2-3 sentences. Name the lead type from STEP 1. Then either QUOTE the evidence of need, or state plainly that there is none. Then say what he would actually do for them, or why he would not.>
+REASONING: <2-3 sentences. Either QUOTE the evidence of need, or state plainly that there is none. Then say what he would actually do for them, or why he would not.>
+
+LEAD_TYPE is the organisation kind from STEP 1, and it decides what he asks them for later, so get it right:
+- builds_software: they build or run software themselves, need or no need
+- sells_services: consultant, agency, lawyer, fractional exec, anyone whose product is their own advice
+- recruiter: recruiter or talent partner
+- creator: creator, coach, commentator, academic, no company that ships software
+- other: none of the above, or the profile is too thin to tell
