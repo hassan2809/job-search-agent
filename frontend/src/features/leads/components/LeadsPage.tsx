@@ -5,6 +5,7 @@ import { BulkFitCheckDialog } from './BulkFitCheckDialog'
 import { FollowUpsBoard } from '@/features/outreach/components/FollowUpsBoard'
 import { DraftQualityPanel } from '@/features/outreach/components/DraftQualityPanel'
 import { PendingConnectionsBoard } from '@/features/outreach/components/PendingConnectionsBoard'
+import { SeasonNote } from '@/features/outreach/components/SeasonNote'
 import { useLeads } from '../hooks'
 import type { LeadFilters } from '@/api/leads'
 import { Input } from '@/components/ui/input'
@@ -54,6 +55,8 @@ export function LeadsPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-6">
+        <SeasonNote />
+
         <PendingConnectionsBoard />
 
         <FollowUpsBoard />

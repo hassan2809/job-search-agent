@@ -1,4 +1,10 @@
-import { MAX_MESSAGE_STAGES, MESSAGE_STAGES, REPLY_WINDOW_HOURS, SEND_WINDOW } from './constants'
+import {
+  DAYS_BEFORE_FIRST_MESSAGE,
+  MAX_MESSAGE_STAGES,
+  MESSAGE_STAGES,
+  REPLY_WINDOW_HOURS,
+  SEND_WINDOW,
+} from './constants'
 import type { OutreachDetailOut } from '@/api/types'
 
 export interface Reminder {
@@ -108,14 +114,38 @@ export function getReminders(outreach: OutreachDetailOut): Reminder[] {
     case 'connection_sent':
       return [{ text: 'Connection request sent — check LinkedIn and record whether they accepted.', urgent: false }]
 
-    case 'connection_accepted':
+    case 'connection_accepted': {
+      // They may have replied on accepting. That is a live conversation, so the wait does not
+      // apply -- answering is now the urgent thing, not the staged sequence.
+      const theySpoke = outreach.messages.some((m) => m.sender === 'them')
+      if (theySpoke) {
+        return [
+          { text: 'They said something when they accepted — reply to that before starting the sequence.', urgent: true },
+        ]
+      }
+
+      const waited = daysSince(outreach.updated_at)
+      const label = MESSAGE_STAGES[0].label
+      if (waited >= DAYS_BEFORE_FIRST_MESSAGE) {
+        return [
+          {
+            text: `Accepted ${waited} day${waited === 1 ? '' : 's'} ago — time to send your first message (${label}).`,
+            urgent: true,
+          },
+        ]
+      }
+      const left = DAYS_BEFORE_FIRST_MESSAGE - waited
       return [
-        { text: `Connection accepted — draft your first message (${MESSAGE_STAGES[0].label}).`, urgent: true },
+        {
+          text: `Accepted ${waited === 0 ? 'today' : `${waited} day${waited === 1 ? '' : 's'} ago`}. Wait ${left} more day${left === 1 ? '' : 's'} before the first message (${label}) — messaging straight after someone accepts reads as automated.`,
+          urgent: false,
+        },
         {
           text: 'If they said something when they accepted, log it first so the message can respond to it.',
           urgent: false,
         },
       ]
+    }
 
     case 'message_drafted':
       return [

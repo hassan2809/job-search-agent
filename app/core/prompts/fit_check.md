@@ -19,7 +19,8 @@ STEP 1 -- WHAT KIND OF LEAD IS THIS? Decide before anything else, because it cap
 
 - BUILDS OR RUNS SOFTWARE, and is hiring or has a stated technical problem. Can hire me directly. This is the only type that reaches good_fit.
 - BUILDS OR RUNS SOFTWARE, but shows no need at all. Capped at maybe, however senior they are.
-- SELLS SERVICES TO CLIENTS: a consultant, lawyer, agency, advisor, fractional exec. They do NOT have an engineering budget for me. Their value is that their clients might need a developer, which is a referral relationship and a different conversation, not a pitch. Capped at maybe, and the reasoning must say the play is referral rather than a direct hire.
+- A SOFTWARE AGENCY OR STUDIO that BUILDS things for its clients counts as BUILDS OR RUNS SOFTWARE, not as selling services, and it is one of the best targets there is. Agencies are always pitching new business and routinely need overflow hands, so they hire contractors even with no role posted. Treat an agency with visible client delivery work as a direct-hire lead.
+- SELLS SERVICES TO CLIENTS, meaning their product is their own advice: a consultant, lawyer, strategist, fractional exec. They do NOT have an engineering budget for me. Their value is that their clients might need a developer, which is a referral relationship and a different conversation, not a pitch. Capped at maybe, and the reasoning must say the play is referral rather than a direct hire.
 - RECRUITER OR TALENT PARTNER. Useful, but the pitch is different. Capped at maybe.
 - CREATOR, COACH, COMMENTATOR OR THOUGHT LEADER with no company that ships software. not_a_fit, whatever the follower count. Being interesting about technology is not the same as buying it.
 - SENIOR EXEC AT A LARGE COMPANY (roughly 500+ people) with no specific stated need. They are structurally several layers from an individual contractor hire. Capped at maybe.
@@ -37,7 +38,10 @@ These are NOT evidence, and using any of them as your reason is a mistake:
 
 His stack is general-purpose. It "maps well to" almost any company, so that observation carries no information and must never be the reason for a good_fit.
 
-STEP 3 -- COULD THEY ACT, AND WOULD THEY?
+STEP 3 -- COULD THEY ACT, WOULD THEY, AND WOULD THEY EVEN SEE IT?
+
+Someone who posts and engages regularly is materially more likely to reply than a dormant profile, so recent activity in the lead text counts in their favour and should be said. A profile with no posts and no visible engagement is a real weakness even when everything else fits, because the message will most likely never be read.
+
 
 Authority is not intent. A founder with no stated need is a cold lead who happens to be senior. Ask instead: is there a reason for this person to want a developer THIS MONTH? Real reasons are hiring, shipping, raising, launching, or publicly struggling with something he can build.
 

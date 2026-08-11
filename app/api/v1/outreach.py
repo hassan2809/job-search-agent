@@ -61,10 +61,17 @@ router = APIRouter()
 # so the same four-step spacing is kept but each step is what a developer would actually say.
 MESSAGE_STAGES = [
     {
-        "purpose": "Lead with their product, mission or open role and why it genuinely interests "
-        "me. Where their stack or a concrete technical problem is visible in the lead text, name it "
-        "and be specific about the relief I offer rather than promising broad improvement. One "
-        "sentence at most on the part of my background that connects, then an open question",
+        "purpose": "Open the conversation. Lead with their product, mission or open role and why it "
+        "genuinely interests me. Where their stack or a concrete technical problem is visible in the "
+        "lead text, name it and be specific about the relief I offer rather than promising broad "
+        "improvement. One clause at most on the part of my background that connects. "
+        "End on a LIGHT ROUTING QUESTION, not a pitch: 'is this the kind of thing you bring someone "
+        "in for?' or 'who would be the right person to talk to about this?'. A senior person can "
+        "answer either in five words, and the answer decides everything that follows, so it is worth "
+        "spending the first message's one question on. "
+        "DO NOT describe a project in any detail and DO NOT include my portfolio link: showing the "
+        "work is the NEXT message's whole job, and spending it here leaves that message with nothing "
+        "to say and makes the follow-up read as a repeat",
         "min_days": 3,
     },
     {
@@ -78,8 +85,10 @@ MESSAGE_STAGES = [
         "min_days": 5,
     },
     {
-        "purpose": "Still anchored to their work, ask plainly whether there is a role, a contract or "
-        "a project where I would fit, or who I should be talking to",
+        "purpose": "THE DIRECT ASK. Stage 1 asked lightly and got no answer, so ask plainly now: is "
+        "there a role, a contract or a project where I would fit, and if not, who should I be "
+        "talking to. Still anchored to their work, still short. This is the message that makes the "
+        "purpose of the whole thread explicit, so do not hedge it",
         "min_days": 6,
     },
     {
