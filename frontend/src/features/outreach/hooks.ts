@@ -9,6 +9,8 @@ export const outreachKeys = {
   needsNextMessage: (minDaysOverride?: number) => ['outreach', 'needs-next-message', minDaysOverride] as const,
   checkStats: () => ['outreach', 'check-stats'] as const,
   pendingConnections: () => ['outreach', 'pending-connections'] as const,
+  episodes: () => ['outreach', 'episodes'] as const,
+  reflection: () => ['outreach', 'reflection'] as const,
 }
 
 export function useOutreach(id: number) {
@@ -52,6 +54,30 @@ export function useCheckStats() {
   return useQuery({
     queryKey: outreachKeys.checkStats(),
     queryFn: () => outreachApi.checkStats(),
+  })
+}
+
+export function useEpisodes() {
+  return useQuery({
+    queryKey: outreachKeys.episodes(),
+    queryFn: () => outreachApi.episodes(),
+  })
+}
+
+export function useReflection() {
+  return useQuery({
+    queryKey: outreachKeys.reflection(),
+    queryFn: () => outreachApi.latestReflection(),
+  })
+}
+
+export function useGenerateReflection() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => outreachApi.generateReflection(),
+    onSuccess: (data) => {
+      queryClient.setQueryData(outreachKeys.reflection(), data)
+    },
   })
 }
 

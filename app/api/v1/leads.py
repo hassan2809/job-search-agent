@@ -40,6 +40,8 @@ OUTREACH_STATUSES = {
     "closed_won",
     "closed_declined",
     "closed_no_response",
+    "closed_seen_no_reply",
+    "closed_not_seen",
     "closed_not_interested",
 }
 

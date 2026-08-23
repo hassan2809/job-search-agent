@@ -2,11 +2,13 @@ import { api } from './client'
 import type {
   CheckStatsOut,
   CloseStatus,
+  EpisodesOut,
   MatchOut,
   NeedsNextMessageOut,
   PendingConnectionOut,
   OutreachDetailOut,
   OutreachOut,
+  ReflectionOut,
 } from './types'
 
 export const outreachApi = {
@@ -46,6 +48,13 @@ export const outreachApi = {
 
   // How often the deterministic draft checks fire, and whether the automatic retry fixes them.
   checkStats: () => api.get<CheckStatsOut>('/outreach/check-stats'),
+
+  // Every past outreach reconstructed as an episode, plus counts. Derived on read, nothing stored.
+  episodes: () => api.get<EpisodesOut>('/outreach/episodes'),
+  // Distills every closed episode into standing guidance, and stores it. 409s below the minimum
+  // episode count -- the caller should surface that detail message rather than retry.
+  generateReflection: () => api.post<ReflectionOut>('/outreach/reflections/generate'),
+  latestReflection: () => api.get<ReflectionOut | null>('/outreach/reflections'),
 
   get: (id: number) => api.get<OutreachDetailOut>(`/outreach/${id}`),
   getByLead: (leadId: number) => api.get<OutreachDetailOut>(`/outreach/by-lead/${leadId}`),

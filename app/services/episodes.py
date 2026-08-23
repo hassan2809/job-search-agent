@@ -21,12 +21,16 @@ from app.models.lead import Lead
 from app.models.match import Match
 from app.models.outreach import Outreach, OutreachMessage
 
-# Outcomes that say something about whether the approach worked.
+# Outcomes that say something about whether the approach worked. seen_no_reply and not_seen are the
+# read-receipt split of what used to be a single accepted_no_reply bucket -- accepted_no_reply
+# remains for outreaches closed no_response before anyone checked (or ever checks) the read receipt.
 LEARNABLE_OUTCOMES = {
     "won",
     "replied",
     "declined",
     "accepted_no_reply",
+    "seen_no_reply",
+    "not_seen",
     "connection_declined",
     "connection_ignored",
 }
@@ -42,6 +46,8 @@ CONNECTION_SENT_STATUSES = {
     "closed_won",
     "closed_declined",
     "closed_no_response",
+    "closed_seen_no_reply",
+    "closed_not_seen",
 }
 
 HOOK_WORDS = 14
@@ -87,6 +93,14 @@ def _outcome(status: str, got_reply: bool) -> str:
     # and they answered it. Keep the two apart or a reflection will treat both as "did not work".
     if status == "closed_declined":
         return "declined"
+    # closed_seen_no_reply / closed_not_seen are the read-receipt split of "no response": whether
+    # LinkedIn showed the last message as seen when I closed this out. Seen-and-ignored means the
+    # message itself didn't land; never-seen means the problem is upstream of the message (dead
+    # profile, bad timing). closed_no_response remains for whenever that genuinely isn't known.
+    if status == "closed_seen_no_reply":
+        return "seen_no_reply"
+    if status == "closed_not_seen":
+        return "not_seen"
     if status == "closed_no_response":
         return "accepted_no_reply"
     if got_reply:

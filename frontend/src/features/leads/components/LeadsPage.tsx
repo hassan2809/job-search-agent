@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AddLeadForm } from './AddLeadForm'
 import { LeadsList } from './LeadsList'
 import { BulkFitCheckDialog } from './BulkFitCheckDialog'
@@ -50,7 +51,12 @@ export function LeadsPage() {
             <h1 className="text-lg font-semibold text-foreground">Client Outreach Agent</h1>
             <p className="text-sm text-muted-foreground">Review leads and run fit-checks</p>
           </div>
-          <AddLeadForm />
+          <div className="flex items-center gap-4">
+            <Link to="/efficiency" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
+              Efficiency
+            </Link>
+            <AddLeadForm />
+          </div>
         </div>
       </header>
 
@@ -126,6 +132,8 @@ export function LeadsPage() {
               <NativeSelectOption value="closed_won">Won</NativeSelectOption>
               <NativeSelectOption value="closed_declined">Declined</NativeSelectOption>
               <NativeSelectOption value="closed_no_response">No response (closed)</NativeSelectOption>
+              <NativeSelectOption value="closed_seen_no_reply">Seen, no reply (closed)</NativeSelectOption>
+              <NativeSelectOption value="closed_not_seen">Not seen (closed)</NativeSelectOption>
               <NativeSelectOption value="closed_not_interested">Not interested (my call)</NativeSelectOption>
             </NativeSelect>
           </div>

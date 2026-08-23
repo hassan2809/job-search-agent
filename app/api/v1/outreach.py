@@ -113,9 +113,22 @@ CONNECTION_RESPONSE_STATUS_MAP = {
 }
 
 # closed_not_interested covers *my* decision to stop pursuing a lead regardless of anything they
-# said or didn't say -- distinct from closed_declined (they said no) and closed_no_response (they
-# never replied), both of which describe the lead's behavior, not mine.
-CLOSE_STATUSES = {"closed_won", "closed_declined", "closed_no_response", "closed_not_interested"}
+# said or didn't say -- distinct from closed_declined (they said no) and the no-response family
+# (they never replied), which describes the lead's behavior, not mine.
+#
+# closed_seen_no_reply and closed_not_seen are the read-receipt split of closed_no_response: whether
+# LinkedIn showed the last message as seen. Two different lessons, not one -- seen-and-ignored is a
+# content problem, never-seen might just be a dead profile or bad timing. closed_no_response remains
+# for whenever the read receipt genuinely can't be checked; picking one of the split statuses when
+# it's known is what lets a reflection learn the difference. See app/services/episodes.py.
+CLOSE_STATUSES = {
+    "closed_won",
+    "closed_declined",
+    "closed_no_response",
+    "closed_seen_no_reply",
+    "closed_not_seen",
+    "closed_not_interested",
+}
 
 
 def _get_lead_or_404(lead_id: int, db: Session) -> Lead:

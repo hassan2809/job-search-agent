@@ -3,8 +3,15 @@
 export type FitVerdict = 'good_fit' | 'maybe' | 'not_a_fit'
 export type FitStatusFilter = FitVerdict | 'not_checked'
 
-// Mirrors CLOSE_STATUSES in app/api/v1/outreach.py.
-export type CloseStatus = 'closed_won' | 'closed_declined' | 'closed_no_response' | 'closed_not_interested'
+// Mirrors CLOSE_STATUSES in app/api/v1/outreach.py. closed_seen_no_reply and closed_not_seen are
+// the read-receipt split of closed_no_response, chosen at close time rather than tracked per message.
+export type CloseStatus =
+  | 'closed_won'
+  | 'closed_declined'
+  | 'closed_no_response'
+  | 'closed_seen_no_reply'
+  | 'closed_not_seen'
+  | 'closed_not_interested'
 
 // Mirrors OUTREACH_STATUSES in app/api/v1/leads.py (Outreach.status values plus "not_started").
 export type OutreachStatusFilter =
@@ -20,6 +27,8 @@ export type OutreachStatusFilter =
   | 'closed_won'
   | 'closed_declined'
   | 'closed_no_response'
+  | 'closed_seen_no_reply'
+  | 'closed_not_seen'
   | 'closed_not_interested'
 
 export interface LeadOut {
@@ -125,4 +134,57 @@ export interface OutreachDetailOut extends OutreachOut {
 export interface NeedsNextMessageOut extends OutreachOut {
   lead_title: string
   days_since_last_message: number
+}
+
+// Mirrors app/services/episodes.py's Episode dataclass / app/schemas/outreach.py's EpisodeOut.
+// One reconstructed past (or in-flight) outreach -- nothing here is stored, it's derived on read.
+export type EpisodeOutcome =
+  | 'won'
+  | 'replied'
+  | 'declined'
+  | 'accepted_no_reply'
+  | 'seen_no_reply'
+  | 'not_seen'
+  | 'connection_declined'
+  | 'connection_ignored'
+  | 'dropped'
+  | 'open'
+
+export interface EpisodeOut {
+  outreach_id: number
+  lead_id: number
+  lead_author: string
+  lead_type: string | null
+  fit_verdict: FitVerdict | null
+  origin_type: 'disclosed_need' | 'prospected'
+  status: string
+  outcome: EpisodeOutcome
+  connection_accepted: boolean | null
+  stages_sent: number
+  got_reply: boolean
+  days_to_first_reply: number | null
+  hook: string
+  projects_mentioned: string[]
+  unresolved_failures: number
+}
+
+export interface EpisodesOut {
+  // Mirrors app/services/episodes.py's summarise(): counts a human can read without re-deriving.
+  summary: {
+    total: number
+    with_known_outcome: number
+    open: number
+    dropped_by_me: number
+    replied: number
+    by_lead_type: Record<string, { episodes: number; replied: number }>
+    by_outcome: Record<string, number>
+  }
+  episodes: EpisodeOut[]
+}
+
+export interface ReflectionOut {
+  id: number
+  episode_count: number
+  guidance: string
+  created_at: string
 }

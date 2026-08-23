@@ -19,6 +19,8 @@ const OUTREACH_STATUS_VARIANT: Record<string, BadgeVariant> = {
   closed_declined: 'destructive',
   connection_declined: 'destructive',
   closed_no_response: 'secondary',
+  closed_seen_no_reply: 'secondary',
+  closed_not_seen: 'secondary',
   connection_no_response: 'secondary',
   closed_not_interested: 'secondary',
 }

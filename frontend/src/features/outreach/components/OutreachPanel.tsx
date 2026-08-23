@@ -74,6 +74,8 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
     'closed_won',
     'closed_declined',
     'closed_no_response',
+    'closed_seen_no_reply',
+    'closed_not_seen',
     'closed_not_interested',
   ]
   if (closedStatuses.includes(outreach.status)) {
@@ -211,7 +213,7 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
         </Card>
       )}
 
-      <div className="flex items-center gap-2 border-t pt-3">
+      <div className="flex flex-wrap items-center gap-2 border-t pt-3">
         <span className="text-sm text-muted-foreground">Close out:</span>
         <Button
           size="sm"
@@ -233,9 +235,17 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
           size="sm"
           variant="outline"
           disabled={closeOutreach.isPending}
-          onClick={() => closeOutreach.mutate({ id: outreach.id, status: 'closed_no_response' })}
+          onClick={() => closeOutreach.mutate({ id: outreach.id, status: 'closed_seen_no_reply' })}
         >
-          No response
+          Seen, no reply
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={closeOutreach.isPending}
+          onClick={() => closeOutreach.mutate({ id: outreach.id, status: 'closed_not_seen' })}
+        >
+          Not seen
         </Button>
         <Button
           size="sm"
@@ -245,6 +255,7 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
         >
           Not interested (my call)
         </Button>
+        <ErrorText error={closeOutreach.error} />
       </div>
     </div>
   )

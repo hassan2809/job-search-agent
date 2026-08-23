@@ -117,4 +117,6 @@ class ReviseIn(BaseModel):
 
 
 class CloseIn(BaseModel):
-    status: str  # closed_won | closed_declined | closed_no_response | closed_not_interested
+    # closed_won | closed_declined | closed_no_response | closed_seen_no_reply | closed_not_seen |
+    # closed_not_interested
+    status: str
