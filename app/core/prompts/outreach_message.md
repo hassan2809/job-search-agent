@@ -39,20 +39,20 @@ Use those two sections as evidence, not as a template. Never copy an opening tha
 
 1. THE HOOK. Read ALL the lead text first; the strongest hook is usually further down. Reaching out for a real reason beats better copy: they are hiring, they shipped or raised, they changed roles, or they described a problem I work on. An open ENGINEERING role is the strongest hook there is. If the only open roles are product, design or sales, do not lead with them and do not pretend to be a candidate for them.
 
+Do not open by naming the detail as the subject of the sentence: not "your post about X stood out", not "I noticed you're hiring for Y", not "congrats on Z". That construction is what makes a message read as though an agent picked a detail off a profile and slotted it in, and it is exactly what gets these ignored. Open instead with a genuine thought about the problem or situation the detail points to, the kind you would actually have. The detail should surface inside that thought, not introduce it.
+
+BAD: "I noticed you're hiring for a platform engineer at Northwind Labs, and your recent post about scaling challenges caught my eye."
+GOOD: "Scaling a platform team is usually less about the infrastructure and more about who you trust to touch it unsupervised. Saw Northwind is hiring for exactly that kind of role."
+
 2. THE SHAPE. Governs everything below it. Skip this section entirely if the purpose above is a soft close.
 - The MAJORITY is about THEM. At most ONE sentence about me.
-- Open on their story, never on who I am.
-- Name one specific real thing: their product, their mission, the role they are hiring for, or something they said. Never vague flattery, never "doing great things".
-- Say why THAT interests me, in terms of their problem. "Making card payments simple for small merchants is genuinely hard" counts. "I build payments systems" does not, because it is about me.
+- Open with the thought from THE HOOK above, never with who I am and never by citing the detail directly.
+- Say why the underlying problem or situation genuinely interests me, in terms of THEIR problem, not mine. "Making card payments simple for small merchants is genuinely hard" counts. "I build payments systems" does not, because it is about me.
 - One sentence connecting my background to it.
 - One easy question to end. Open beats yes/no, but never one that needs ten minutes to answer.
-Count the sentences before finishing. If more than one is about me, cut it back.
+Count the sentences before finishing. If more than one is about me, cut it back. If the opening sentence could be regenerated for ten different leads by swapping one noun, rewrite it: that is what a template looks like from the outside.
 
-3. THE ASK, which depends on the lead type named in the FIT ASSESSMENT above.
-- Builds or runs software and has a need: ask for the work directly. "Is this the kind of thing you bring someone in for?"
-- Sells services to clients (consultant, agency, lawyer, fractional exec): they have no engineering budget for me, so pitching my availability wastes both our time. Their CLIENTS are the opportunity. Ask whether the people they advise need this built once it has been specified.
-- Recruiter or talent partner: ask what they are briefed on now, and whether my stack matches anything live.
-- Anyone else: no ask at all, just a genuine question.
+3. {ask_guidance}
 
 Being clear that I am available for work is not pushy. Pushy is demanding a meeting or naming a duration. Hiding why I am writing wastes their time and reads as evasive.
 

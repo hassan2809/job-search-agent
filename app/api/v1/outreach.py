@@ -486,13 +486,16 @@ def mark_reply_sent(id: int, db: Session = Depends(get_db)) -> Outreach:
 def reply(id: int, reply_in: ReplyIn, db: Session = Depends(get_db)) -> OutreachDetailOut:
     outreach = _get_outreach_or_404(id, db)
     lead = _get_lead_or_404(outreach.lead_id, db)
+    match = db.get(Match, outreach.match_id) if outreach.match_id else None
 
     db.add(OutreachMessage(outreach_id=outreach.id, sender="them", body=reply_in.body))
     outreach.status = "replied"
     db.flush()
 
     try:
-        draft = outreach_service.suggest_reply(lead, _thread(outreach.id, db))
+        draft = outreach_service.suggest_reply(
+            lead, _thread(outreach.id, db), fit_reasoning=match.fit_reasoning if match else ""
+        )
     except LLMNotConfiguredError as e:
         db.commit()
         raise HTTPException(status_code=503, detail=str(e)) from e

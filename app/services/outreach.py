@@ -53,6 +53,19 @@ ORIGIN_GUIDANCE = {
     ),
 }
 
+# What to ask for depends entirely on the lead type named in the FIT ASSESSMENT -- a company that
+# ships software can hire directly, a consultant can only refer, a recruiter is briefed on other
+# people's roles. Shared between outreach_message.md and reply_suggestion.md (both inject this as
+# {ask_guidance}) rather than duplicated prose in each file, because two copies drift: this exact
+# gap is what let a reply default to "are you hiring" for a lead whose own business is scaling
+# OTHER companies' engineering teams, because the reply prompt had no ASK guidance at all to weigh
+# against a generic pitch.
+ASK_GUIDANCE = """THE ASK, which depends on the lead type named in the FIT ASSESSMENT above:
+- Builds or runs software and has a need: ask for the work directly. "Is this the kind of thing you bring someone in for?"
+- Sells services to clients (consultant, agency, lawyer, fractional exec, or a company whose own business is staffing or scaling OTHER companies' engineering teams): they have no engineering budget for me, so pitching my availability wastes both our time. Their CLIENTS are the opportunity. Ask whether the people they advise need this built once it has been specified.
+- Recruiter or talent partner: ask what they are briefed on now, and whether my stack matches anything live.
+- Anyone else, or the fit assessment gives no real signal: no ask at all. A guessed ask is worse than none -- say something specific instead and leave it there."""
+
 # Whether this is my first staged message is decided by message_count, NOT by whether the thread is
 # empty. They can reply the moment they accept the connection -- often just "nice to meet you" -- and
 # reading that as "we're already in conversation" would skip the pitch entirely.
@@ -235,6 +248,7 @@ def draft_next_message(
         lead_text=lead_text,
         fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS),
         origin_guidance=ORIGIN_GUIDANCE.get(origin_type, ORIGIN_GUIDANCE["prospected"]),
+        ask_guidance=ASK_GUIDANCE,
         thread_text=_thread_text(thread),
         stage_purpose=stage_purpose,
         position_guidance=POSITION_GUIDANCE["first" if message_count == 0 else "follow_up"],
@@ -303,7 +317,7 @@ def revise_message(
     )
 
 
-def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> DraftResult:
+def suggest_reply(lead: Lead, thread: list[OutreachMessage], fit_reasoning: str = "") -> DraftResult:
     lead_text = _lead_text(lead)
     projects_text = get_projects_text()
     prompt = load_prompt(
@@ -312,6 +326,9 @@ def suggest_reply(lead: Lead, thread: list[OutreachMessage]) -> DraftResult:
         resume_text=get_skills_text(),
         projects_text=projects_text,
         lead_text=lead_text,
+        fit_reasoning=_cap(fit_reasoning, MAX_FIT_REASONING_CHARS)
+        or "No fit assessment on record for this lead.",
+        ask_guidance=ASK_GUIDANCE,
         thread_text=_thread_text(thread),
     )
     # Repeated-project is off here: if they asked about a project by name, naming it back is the

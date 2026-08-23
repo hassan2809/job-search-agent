@@ -29,6 +29,13 @@ BANNED_PHRASES = (
     "would love to explore synergies",
     "worth a 15-min demo",
     "i saw you're active on linkedin",
+    # The connection_note and outreach_message prompts both instruct against naming a lead detail
+    # as a sentence's grammatical subject ("your post about X caught my attention") because it is
+    # the clearest tell that a detail was picked off a profile and slotted in. That's a prompt rule,
+    # and prompt rules leak, so its sharpest surface forms are enforced here too.
+    "caught my attention",
+    "caught my eye",
+    "stood out to me",
 )
 
 MAX_MESSAGE_WORDS = 100
