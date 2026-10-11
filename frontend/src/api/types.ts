@@ -1,5 +1,10 @@
 // Mirrors app/schemas/lead.py and app/schemas/outreach.py.
 
+// Mirrors ORIGIN_GUIDANCE in app/services/outreach.py. hiring_signal is an indirect-but-real signal
+// (a job ad for a manual ops role, funding news, a new Head of Ops/CTO) distinct from disclosed_need
+// (they personally said "I need a developer").
+export type OriginType = 'disclosed_need' | 'hiring_signal' | 'prospected'
+
 export type FitVerdict = 'good_fit' | 'maybe' | 'not_a_fit'
 export type FitStatusFilter = FitVerdict | 'not_checked'
 
@@ -41,7 +46,7 @@ export interface LeadOut {
   author: string
   contact_email: string | null
   is_manual: boolean
-  origin_type: 'disclosed_need' | 'prospected'
+  origin_type: OriginType
   posted_at: string | null
   fetched_at: string
   latest_verdict: FitVerdict | null
@@ -51,7 +56,7 @@ export interface LeadOut {
 export interface LeadManualIn {
   url: string
   raw_content?: string
-  origin_type?: 'disclosed_need' | 'prospected'
+  origin_type?: OriginType
   author?: string
 }
 
@@ -87,11 +92,19 @@ export interface OutreachMessageOut {
   outreach_id: number
   sender: 'me' | 'them'
   body: string
+  // Which channel this specific message went out on. A lead can get both over time, so this lives
+  // on the message, not the outreach. Defaults to 'linkedin' for everything sent before email
+  // existed as a channel.
+  channel: 'linkedin' | 'email'
   created_at: string
   // Rules this draft STILL breaks after the automatic retry. Empty for clean drafts, for messages
   // they sent, and for anything drafted before checks existed.
   check_failures: CheckFailure[]
 }
+
+// opening = first email, value_add = day-4 follow-up, clear_ask = day-10 follow-up. Mirrors
+// FOLLOW_UP_GUIDANCE in app/services/outreach.py.
+export type EmailFollowUpStage = 'opening' | 'value_add' | 'clear_ask'
 
 export interface PendingConnectionOut {
   id: number
@@ -120,7 +133,7 @@ export interface OutreachOut {
   id: number
   lead_id: number
   match_id: number | null
-  origin_type: 'disclosed_need' | 'prospected'
+  origin_type: OriginType
   status: string
   message_count: number
   created_at: string
@@ -156,7 +169,7 @@ export interface EpisodeOut {
   lead_author: string
   lead_type: string | null
   fit_verdict: FitVerdict | null
-  origin_type: 'disclosed_need' | 'prospected'
+  origin_type: OriginType
   status: string
   outcome: EpisodeOutcome
   connection_accepted: boolean | null

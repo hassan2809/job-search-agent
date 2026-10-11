@@ -3,7 +3,7 @@
 export const MESSAGE_STAGES = [
   { label: 'Intro & overlap', minDays: 3 },
   { label: 'Show my work', minDays: 5 },
-  { label: 'Direct ask', minDays: 6 },
+  { label: 'Direct offer', minDays: 6 },
   { label: 'Soft close', minDays: 7 },
 ] as const
 

@@ -147,11 +147,16 @@ export function getReminders(outreach: OutreachDetailOut): Reminder[] {
       ]
     }
 
-    case 'message_drafted':
+    case 'message_drafted': {
+      // Email skips the connection_* states entirely and lands straight here as its opening touch
+      // (see POST /outreach/{lead_id}/email), so this can't assume LinkedIn the way it used to.
+      const lastMessage = outreach.messages[outreach.messages.length - 1]
+      const channel = lastMessage?.channel === 'email' ? 'email' : 'LinkedIn'
       return [
-        { text: 'Message drafted — send it on LinkedIn, then mark it sent.', urgent: true },
-        ...sendWindowReminder(),
+        { text: `Message drafted — send it via ${channel}, then mark it sent.`, urgent: true },
+        ...(channel === 'LinkedIn' ? sendWindowReminder() : []),
       ]
+    }
 
     case 'awaiting_reply': {
       if (outreach.message_count >= MAX_MESSAGE_STAGES) {
@@ -182,15 +187,18 @@ export function getReminders(outreach: OutreachDetailOut): Reminder[] {
       ]
     }
 
-    case 'replied':
+    case 'replied': {
+      const lastMessage = outreach.messages[outreach.messages.length - 1]
+      const channel = lastMessage?.channel === 'email' ? 'email' : 'LinkedIn'
       return [
         {
-          text: 'They replied — review the suggested response below, send it on LinkedIn, then mark it sent.',
+          text: `They replied — review the suggested response below, send it via ${channel}, then mark it sent.`,
           urgent: true,
         },
         ...replyLatencyReminder(outreach),
-        ...sendWindowReminder(),
+        ...(channel === 'LinkedIn' ? sendWindowReminder() : []),
       ]
+    }
 
     default:
       return []

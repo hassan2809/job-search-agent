@@ -1,13 +1,63 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useLead } from '../hooks'
+import { useLead, useSetContactEmail } from '../hooks'
 import { parseLeadProfile } from '../utils'
 import { useFitCheck } from '@/features/outreach/hooks'
 import { OutreachPanel } from '@/features/outreach/components/OutreachPanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { MatchOut } from '@/api/types'
+
+// Looked up by hand (Hunter.io, the company site) -- there is no live lookup integration. Required
+// before POST /outreach/{lead_id}/email will draft anything.
+function ContactEmailEditor({ leadId, contactEmail }: { leadId: number; contactEmail: string | null }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(contactEmail ?? '')
+  const setContactEmail = useSetContactEmail()
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        className="text-left text-sm text-muted-foreground hover:text-foreground hover:underline"
+        onClick={() => {
+          setValue(contactEmail ?? '')
+          setEditing(true)
+        }}
+      >
+        {contactEmail ? `Email: ${contactEmail}` : 'Add contact email'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        type="email"
+        placeholder="hassan@example.com"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        className="h-7 max-w-xs text-sm"
+        autoFocus
+      />
+      <Button
+        size="sm"
+        disabled={setContactEmail.isPending}
+        onClick={() =>
+          setContactEmail.mutate({ id: leadId, contactEmail: value.trim() }, { onSuccess: () => setEditing(false) })
+        }
+      >
+        Save
+      </Button>
+      <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+        Cancel
+      </Button>
+      {setContactEmail.error && <p className="text-xs text-destructive">{setContactEmail.error.message}</p>}
+    </div>
+  )
+}
 
 const VERDICT_VARIANT: Record<MatchOut['fit_verdict'], 'default' | 'secondary' | 'destructive'> = {
   good_fit: 'default',
@@ -49,6 +99,9 @@ export function LeadDetailPage() {
                 >
                   {lead.url}
                 </a>
+                <div className="mt-1">
+                  <ContactEmailEditor leadId={lead.id} contactEmail={lead.contact_email} />
+                </div>
               </div>
               <Badge variant="outline">{lead.origin_type}</Badge>
             </div>
@@ -78,7 +131,11 @@ export function LeadDetailPage() {
                 <CardTitle className="text-base">Outreach</CardTitle>
               </CardHeader>
               <CardContent>
-                <OutreachPanel leadId={lead.id} fitVerdict={result?.fit_verdict ?? lead.latest_verdict} />
+                <OutreachPanel
+                  leadId={lead.id}
+                  fitVerdict={result?.fit_verdict ?? lead.latest_verdict}
+                  contactEmail={lead.contact_email}
+                />
               </CardContent>
             </Card>
 

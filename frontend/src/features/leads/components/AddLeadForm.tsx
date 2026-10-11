@@ -12,12 +12,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import type { LeadManualIn } from '@/api/types'
+import type { OriginType } from '@/api/types'
 
 export function AddLeadForm() {
   const [open, setOpen] = useState(false)
   const [url, setUrl] = useState('')
-  const [originType, setOriginType] = useState<LeadManualIn['origin_type']>('prospected')
+  const [originType, setOriginType] = useState<OriginType>('prospected')
   const [rawContent, setRawContent] = useState('')
   const [showPaste, setShowPaste] = useState(false)
   const addLead = useAddLead()
@@ -71,6 +71,16 @@ export function AddLeadForm() {
                   disabled={addLead.isPending}
                 />
                 Disclosed need
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="origin_type"
+                  checked={originType === 'hiring_signal'}
+                  onChange={() => setOriginType('hiring_signal')}
+                  disabled={addLead.isPending}
+                />
+                Hiring signal
               </label>
               <label className="flex items-center gap-1.5">
                 <input

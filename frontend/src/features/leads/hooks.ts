@@ -36,6 +36,18 @@ export function useAddLead() {
   })
 }
 
+export function useSetContactEmail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, contactEmail }: { id: number; contactEmail: string }) =>
+      leadsApi.setContactEmail(id, contactEmail),
+    onSuccess: (data) => {
+      queryClient.setQueryData(leadsKeys.detail(data.id), data)
+      queryClient.invalidateQueries({ queryKey: ['leads', 'list'] })
+    },
+  })
+}
+
 interface BulkFitCheckState {
   running: boolean
   total: number

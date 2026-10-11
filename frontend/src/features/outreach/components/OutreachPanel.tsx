@@ -5,6 +5,8 @@ import {
   useCloseOutreach,
   useConnect,
   useConnectionResponse,
+  useConnectWithoutNote,
+  useDraftEmail,
   useMarkConnectionSent,
   useMarkReplySent,
   useMarkSent,
@@ -18,16 +20,85 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { FitVerdict } from '@/api/types'
+import type { FitVerdict, OutreachDetailOut } from '@/api/types'
 
 function ErrorText({ error }: { error: Error | null }) {
   if (!error) return null
   return <p className="text-sm text-destructive">{error.message}</p>
 }
 
-export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdict: FitVerdict | null }) {
+// Email runs independently of the LinkedIn connection lifecycle -- the plan sends it first, before
+// any connection request -- so this renders the same way whether there's no outreach yet, a closed
+// one, or an active one, rather than being wired into any one status branch above.
+function EmailSection({
+  leadId,
+  contactEmail,
+  outreach,
+}: {
+  leadId: number
+  contactEmail: string | null
+  outreach: OutreachDetailOut | null
+}) {
+  const draftEmail = useDraftEmail()
+  const hasEmailSent = outreach?.messages.some((m) => m.channel === 'email') ?? false
+
+  if (!contactEmail) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        No contact email saved for this lead yet. Look one up (Hunter.io or the company site) and save
+        it above to enable email outreach.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {!hasEmailSent ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={draftEmail.isPending}
+          onClick={() => draftEmail.mutate({ leadId, followUpStage: 'opening' })}
+        >
+          {draftEmail.isPending ? 'Drafting...' : 'Draft opening email'}
+        </Button>
+      ) : (
+        <>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={draftEmail.isPending}
+            onClick={() => draftEmail.mutate({ leadId, followUpStage: 'value_add' })}
+          >
+            {draftEmail.isPending ? 'Drafting...' : 'Draft day-4 follow-up'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={draftEmail.isPending}
+            onClick={() => draftEmail.mutate({ leadId, followUpStage: 'clear_ask' })}
+          >
+            {draftEmail.isPending ? 'Drafting...' : 'Draft day-10 follow-up'}
+          </Button>
+        </>
+      )}
+      <ErrorText error={draftEmail.error} />
+    </div>
+  )
+}
+
+export function OutreachPanel({
+  leadId,
+  fitVerdict,
+  contactEmail,
+}: {
+  leadId: number
+  fitVerdict: FitVerdict | null
+  contactEmail: string | null
+}) {
   const { data: outreach, isLoading } = useOutreachByLead(leadId)
   const connect = useConnect()
+  const connectWithoutNote = useConnectWithoutNote()
   const markConnectionSent = useMarkConnectionSent()
   const connectionResponse = useConnectionResponse()
   const nextMessage = useNextMessage()
@@ -37,22 +108,33 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
   const closeOutreach = useCloseOutreach()
   const passOnLead = usePassOnLead()
   const [replyBody, setReplyBody] = useState('')
+  const [replyChannel, setReplyChannel] = useState<'linkedin' | 'email'>('linkedin')
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading outreach status...</p>
 
   if (!outreach) {
     const canConnect = fitVerdict && fitVerdict !== 'not_a_fit'
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-3">
         {!fitVerdict && <p className="text-sm text-muted-foreground">Run a fit-check first to unlock outreach.</p>}
         {fitVerdict === 'not_a_fit' && (
-          <p className="text-sm text-muted-foreground">Fit-check came back "not a fit" — no connection request.</p>
+          <p className="text-sm text-muted-foreground">Fit-check came back "not a fit" — no outreach.</p>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canConnect && (
-            <Button size="sm" disabled={connect.isPending} onClick={() => connect.mutate({ leadId })}>
-              {connect.isPending ? 'Drafting...' : 'Send connection request'}
-            </Button>
+            <>
+              <Button size="sm" disabled={connect.isPending} onClick={() => connect.mutate({ leadId })}>
+                {connect.isPending ? 'Drafting...' : 'Send connection request'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={connectWithoutNote.isPending}
+                onClick={() => connectWithoutNote.mutate(leadId)}
+              >
+                {connectWithoutNote.isPending ? 'Saving...' : 'Connect without a note'}
+              </Button>
+            </>
           )}
           <Button
             size="sm"
@@ -63,7 +145,12 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
             {passOnLead.isPending ? 'Saving...' : 'Not interested (my call)'}
           </Button>
         </div>
-        <ErrorText error={connect.error ?? passOnLead.error} />
+        <ErrorText error={connect.error ?? connectWithoutNote.error ?? passOnLead.error} />
+        {canConnect && (
+          <div className="border-t pt-3">
+            <EmailSection leadId={leadId} contactEmail={contactEmail} outreach={null} />
+          </div>
+        )}
       </div>
     )
   }
@@ -83,6 +170,12 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
       <div className="flex flex-col gap-3">
         <Badge variant="secondary">{outreach.status}</Badge>
         <MessageThread messages={outreach.messages} outreachId={outreach.id} />
+        {/* Closed on LinkedIn is not closed everywhere -- a fresh email touch reopens this thread
+            server-side (see POST /outreach/{lead_id}/email), which is deliberate per the plan. */}
+        <div className="border-t pt-3">
+          <p className="mb-2 text-xs text-muted-foreground">Closed on LinkedIn, but email is a separate channel:</p>
+          <EmailSection leadId={leadId} contactEmail={contactEmail} outreach={outreach} />
+        </div>
       </div>
     )
   }
@@ -196,12 +289,33 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
               value={replyBody}
               onChange={(e) => setReplyBody(e.target.value)}
             />
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-muted-foreground">Came in on:</span>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="reply_channel"
+                  checked={replyChannel === 'linkedin'}
+                  onChange={() => setReplyChannel('linkedin')}
+                />
+                LinkedIn
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name="reply_channel"
+                  checked={replyChannel === 'email'}
+                  onChange={() => setReplyChannel('email')}
+                />
+                Email
+              </label>
+            </div>
             <Button
               size="sm"
               disabled={reply.isPending || !replyBody.trim()}
               onClick={() =>
                 reply.mutate(
-                  { id: outreach.id, body: replyBody },
+                  { id: outreach.id, body: replyBody, channel: replyChannel },
                   { onSuccess: () => setReplyBody('') },
                 )
               }
@@ -212,6 +326,11 @@ export function OutreachPanel({ leadId, fitVerdict }: { leadId: number; fitVerdi
           </CardContent>
         </Card>
       )}
+
+      <div className="border-t pt-3">
+        <p className="mb-2 text-xs text-muted-foreground">Email (separate from the LinkedIn sequence above):</p>
+        <EmailSection leadId={leadId} contactEmail={contactEmail} outreach={outreach} />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t pt-3">
         <span className="text-sm text-muted-foreground">Close out:</span>

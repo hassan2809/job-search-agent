@@ -1,4 +1,4 @@
-You are rewriting ONE existing draft for a solo full-stack developer looking for freelance work, contracts, or a job, to his instruction.
+You are rewriting ONE existing draft for a one-person AI and automation company, never a job seeker, to his instruction.
 
 {positioning}
 

@@ -1,11 +1,20 @@
 import { useState } from 'react'
 import { useReviseMessage } from '../hooks'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import type { OutreachMessageOut } from '@/api/types'
 
 // Common edits, so the frequent cases are one click instead of typing the same sentence again.
 const QUICK_INSTRUCTIONS = ['Make it shorter', 'Less formal', 'Drop the last line']
+
+// An email's stored body is "Subject: ...\n\n<body>" (see _format_email in app/services/outreach.py
+// -- no separate subject column). Split it back out so the subject can render distinctly instead
+// of as the message bubble's first line.
+function splitEmailSubject(body: string): { subject: string | null; text: string } {
+  const match = body.match(/^Subject: (.*)\n\n([\s\S]*)$/)
+  return match ? { subject: match[1], text: match[2] } : { subject: null, text: body }
+}
 
 function ReviseBox({
   outreachId,
@@ -75,16 +84,28 @@ export function MessageThread({ messages, outreachId }: { messages: OutreachMess
         // that need a human edit before they go out -- everything else has already been verified.
         const failures = message.check_failures ?? []
         const isMine = message.sender === 'me'
+        const isEmail = message.channel === 'email'
+        const { subject, text } = isEmail ? splitEmailSubject(message.body) : { subject: null, text: message.body }
 
         return (
           <div key={message.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
             <div className="flex max-w-[80%] flex-col gap-1">
+              {isEmail && (
+                <Badge variant="outline" className={isMine ? 'self-end' : 'self-start'}>
+                  Email
+                </Badge>
+              )}
               <div
                 className={`rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
                   isMine ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
                 }`}
               >
-                {message.body}
+                {subject && (
+                  <p className={`mb-1.5 border-b pb-1.5 font-medium ${isMine ? 'border-primary-foreground/20' : 'border-border'}`}>
+                    {subject}
+                  </p>
+                )}
+                {text}
               </div>
 
               {failures.length > 0 && (

@@ -41,6 +41,24 @@ BANNED_PHRASES = (
 MAX_MESSAGE_WORDS = 100
 MAX_CONNECTION_NOTE_CHARS = 300
 
+# Cold-email rules, from _internal/Client_Acquisition_Plan.md's Cold Outreach Playbook (Step 5):
+# HubSpot's 40M-email study found 50-125 words outperforms both shorter and longer, and a subject
+# under 50 characters lifts open rates. These are stricter/different from the LinkedIn message rules
+# above on purpose -- email is a different medium with different norms, not the same check reused.
+MIN_EMAIL_WORDS = 50
+MAX_EMAIL_WORDS = 125
+MAX_EMAIL_SUBJECT_CHARS = 50
+
+# Banned phrases specific to cold email, from the same playbook. Checked in addition to the shared
+# BANNED_PHRASES above, which still apply (a dash is still a dash, "just checking in" is still dead).
+EMAIL_BANNED_PHRASES = (
+    "i hope this email finds you well",
+    "just following up",
+    "please find attached",
+    "we'd love to schedule a call",
+    "my name is",  # the playbook: "don't introduce yourself, they don't know you and don't care yet"
+)
+
 _PROJECT_HEADING = re.compile(r"^## (.+)$", re.M)
 _EMPLOYER_LINE = re.compile(r"^Employer: (.+)$", re.M)
 
@@ -208,4 +226,62 @@ def check_connection_note(body: str) -> list[Failure]:
             failures.append(_fail("banned_phrase", f'Uses the banned phrase "{phrase}".'))
     if "github" in lowered:
         failures.append(_fail("repo_link", "Mentions GitHub. A connection note carries no links."))
+    return failures
+
+
+def check_email(subject: str, body: str) -> list[Failure]:
+    """Checks a cold email against _internal/Client_Acquisition_Plan.md's Cold Outreach Playbook.
+
+    A different word-count band and a different banned-phrase list from the LinkedIn checks above,
+    deliberately: email is a different medium with its own norms (a subject line, a longer body,
+    its own set of phrases that read as mass-sent), not the same rules reused for a second channel.
+    """
+    failures: list[Failure] = []
+    combined_lower = f"{subject}\n{body}".lower()
+
+    if any(d in subject or d in body for d in DASH_CHARS):
+        failures.append(
+            _fail("dash", "Contains a dash used as punctuation. Use a comma or a full stop.")
+        )
+
+    if len(subject) > MAX_EMAIL_SUBJECT_CHARS:
+        failures.append(
+            _fail(
+                "subject_too_long",
+                f"Subject is {len(subject)} characters, over the {MAX_EMAIL_SUBJECT_CHARS}-character "
+                "limit. Shorten it.",
+            )
+        )
+
+    words = len(body.split())
+    if words < MIN_EMAIL_WORDS:
+        failures.append(
+            _fail("too_short", f"Body is {words} words, under the {MIN_EMAIL_WORDS}-word floor. Say more.")
+        )
+    elif words > MAX_EMAIL_WORDS:
+        failures.append(
+            _fail("too_long", f"Body is {words} words, over the {MAX_EMAIL_WORDS}-word limit. Cut it back.")
+        )
+
+    for phrase in (*BANNED_PHRASES, *EMAIL_BANNED_PHRASES):
+        if phrase in combined_lower:
+            failures.append(_fail("banned_phrase", f'Uses the banned phrase "{phrase}".'))
+
+    if "github" in combined_lower:
+        failures.append(_fail("repo_link", "Mentions GitHub. Point at the portfolio instead."))
+
+    # The real signature (name, positioning, portfolio, LinkedIn) is appended in code after this
+    # check runs -- see _format_email in app/services/outreach.py. A stray sign-off here would
+    # duplicate the name right before that block. Backstop for the same reason every other banned
+    # phrase here is: the prompt already says not to, and prompt rules leak.
+    last_line = next((line.strip() for line in reversed(body.splitlines()) if line.strip()), "")
+    if re.match(r"^(hassan( mehmood)?|best,?|regards,?|thanks,?|cheers,?)$", last_line, re.IGNORECASE):
+        failures.append(
+            _fail(
+                "stray_signoff",
+                f'Ends with "{last_line}", a sign-off the model shouldn\'t write -- the real signature '
+                "is appended automatically. Remove that line.",
+            )
+        )
+
     return failures

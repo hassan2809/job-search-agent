@@ -19,6 +19,9 @@ class Lead(Base):
     author: Mapped[str] = mapped_column(String(255), default="")
     contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_manual: Mapped[bool] = mapped_column(Boolean, default=False)
-    origin_type: Mapped[str] = mapped_column(String(20), default="disclosed_need")  # disclosed_need | prospected
+    # disclosed_need | hiring_signal | prospected. hiring_signal is an indirect-but-real signal (a
+    # job ad for a manual ops role, funding news, a new Head of Ops/CTO) distinct from disclosed_need
+    # (they personally said "I need a developer") -- see ORIGIN_GUIDANCE in app/services/outreach.py.
+    origin_type: Mapped[str] = mapped_column(String(20), default="disclosed_need")
     posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

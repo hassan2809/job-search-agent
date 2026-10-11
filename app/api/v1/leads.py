@@ -14,7 +14,7 @@ from app.models.database import SessionLocal, get_db
 from app.models.lead import Lead
 from app.models.match import Match
 from app.models.outreach import Outreach
-from app.schemas.lead import IngestResult, LeadListOut, LeadManualIn, LeadOut
+from app.schemas.lead import IngestResult, LeadContactEmailIn, LeadListOut, LeadManualIn, LeadOut
 from app.services import excel_import
 from app.utils.dedupe import filter_new_records
 from app.utils.text import derive_title, extract_self_disclosed_email
@@ -286,6 +286,22 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)) -> Lead:
     lead = db.get(Lead, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+    lead.latest_verdict = _attach_latest_verdicts(db, [lead]).get(lead.id)  # type: ignore[attr-defined]
+    lead.latest_outreach_status = _attach_latest_outreach_statuses(db, [lead]).get(lead.id)  # type: ignore[attr-defined]
+    return lead
+
+
+@router.put("/{lead_id}/contact-email", response_model=LeadOut)
+def set_contact_email(lead_id: int, payload: LeadContactEmailIn, db: Session = Depends(get_db)) -> Lead:
+    """Saves a looked-up email address on a lead, so POST /outreach/{lead_id}/email has somewhere to
+    send to. Profile scraping gives context, never an address -- this is always a manual save after
+    looking one up with Hunter.io or the company's own site."""
+    lead = db.get(Lead, lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    lead.contact_email = payload.contact_email.strip() or None
+    db.commit()
+    db.refresh(lead)
     lead.latest_verdict = _attach_latest_verdicts(db, [lead]).get(lead.id)  # type: ignore[attr-defined]
     lead.latest_outreach_status = _attach_latest_outreach_statuses(db, [lead]).get(lead.id)  # type: ignore[attr-defined]
     return lead

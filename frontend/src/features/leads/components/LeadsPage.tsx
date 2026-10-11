@@ -90,6 +90,7 @@ export function LeadsPage() {
             >
               <NativeSelectOption value="all">All origins</NativeSelectOption>
               <NativeSelectOption value="disclosed_need">Disclosed need</NativeSelectOption>
+              <NativeSelectOption value="hiring_signal">Hiring signal</NativeSelectOption>
               <NativeSelectOption value="prospected">Prospected</NativeSelectOption>
             </NativeSelect>
 

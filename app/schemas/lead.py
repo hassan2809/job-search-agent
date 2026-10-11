@@ -27,8 +27,14 @@ class LeadManualIn(BaseModel):
     raw_content: str | None = None
     # Matches the form's default and ORIGIN_GUIDANCE's fallback in app/services/outreach.py --
     # origin_type changes how the outreach message is framed, so the two ends must not disagree.
-    origin_type: str = "prospected"  # disclosed_need | prospected
+    origin_type: str = "prospected"  # disclosed_need | hiring_signal | prospected
     author: str = ""
+
+
+class LeadContactEmailIn(BaseModel):
+    # Looked up by hand (Hunter.io, the company's "About/Team" page) -- there is no live lookup
+    # integration, profile scraping gives context but never an email address.
+    contact_email: str
 
 
 class IngestResult(BaseModel):

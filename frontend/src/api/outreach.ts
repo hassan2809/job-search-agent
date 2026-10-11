@@ -2,6 +2,7 @@ import { api } from './client'
 import type {
   CheckStatsOut,
   CloseStatus,
+  EmailFollowUpStage,
   EpisodesOut,
   MatchOut,
   NeedsNextMessageOut,
@@ -17,8 +18,18 @@ export const outreachApi = {
     api.post<MatchOut>(`/outreach/${leadId}/fit-check${force ? '?force=true' : ''}`),
   connect: (leadId: number, force = false) =>
     api.post<OutreachDetailOut>(`/outreach/${leadId}/connect${force ? '?force=true' : ''}`),
+  // No LLM-drafted note -- for when LinkedIn Premium's note limit is the bottleneck. Goes straight
+  // to connection_sent since there is no draft to review first.
+  connectWithoutNote: (leadId: number) =>
+    api.post<OutreachDetailOut>(`/outreach/${leadId}/connect-without-note`),
   // Marks the lead as not worth pursuing at any point -- even before fit-check/connect happen.
   pass: (leadId: number) => api.post<OutreachOut>(`/outreach/${leadId}/pass`),
+
+  // Drafts a cold email: the opening touch, or a day-4/day-10 follow-up. Not idempotent -- every
+  // call drafts a fresh one, since sending more than one email to the same lead is the point.
+  // Requires the lead to already have a contact_email saved.
+  draftEmail: (leadId: number, followUpStage: EmailFollowUpStage = 'opening') =>
+    api.post<OutreachDetailOut>(`/outreach/${leadId}/email`, { follow_up_stage: followUpStage }),
 
   markConnectionSent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-connection-sent`),
   connectionResponse: (id: number, status: 'accepted' | 'declined' | 'no_response') =>
@@ -27,8 +38,10 @@ export const outreachApi = {
   nextMessage: (id: number) => api.post<OutreachDetailOut>(`/outreach/${id}/next-message`),
   markSent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-sent`),
 
-  // body: one new message, or a full pasted thread to sync retroactively.
-  reply: (id: number, body: string) => api.post<OutreachDetailOut>(`/outreach/${id}/reply`, { body }),
+  // body: one new message, or a full pasted thread to sync retroactively. channel tags which
+  // channel they replied on, so the suggested response goes out the same way.
+  reply: (id: number, body: string, channel: 'linkedin' | 'email' = 'linkedin') =>
+    api.post<OutreachDetailOut>(`/outreach/${id}/reply`, { body, channel }),
   // Records that the suggested response was actually sent -- returns the thread to awaiting_reply.
   markReplySent: (id: number) => api.post<OutreachOut>(`/outreach/${id}/mark-reply-sent`),
 

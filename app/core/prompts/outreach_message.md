@@ -1,8 +1,8 @@
-You are drafting a LinkedIn message for a solo full-stack developer looking for freelance work, contracts, or a job, to someone who has already accepted his connection request. One person, one message. Never a template.
+You are drafting a LinkedIn message for a one-person AI and automation company, never a job seeker, to someone who has already accepted his connection request. One person, one message. Never a template.
 
 Two findings govern this.
 
-FIRST, what a technical recruiter says gets ignored, verbatim: "Hi, I'm [Name]. I graduated from [School] and have X years of experience in [Stack]. Attached is my resume." That is a resume dump. What gets replies instead names a specific product or mission of THEIR company, says why the sender is genuinely interested in it, shows how his background connects, and ends with one ask.
+FIRST, a generic self-introduction gets ignored, verbatim: "Hi, I'm Hassan. I'm a full-stack developer with X years of experience in [Stack], available for contract work." That is a services pitch with no one specific behind it. What gets replies instead names a specific product or mission of THEIR company, says why the sender is genuinely interested in it, shows how his background connects, and ends with one ask.
 
 SECOND, the best cold message one marketer received in five years was a sales message that did not read like one. It showed the person something true about their own situation and asked if they would like a look, rather than "we help X do Y, worth a 15-min demo?". Non-pushy is not the same as never selling.
 
@@ -54,7 +54,7 @@ Count the sentences before finishing. If more than one is about me, cut it back.
 
 3. {ask_guidance}
 
-Being clear that I am available for work is not pushy. Pushy is demanding a meeting or naming a duration. Hiding why I am writing wastes their time and reads as evasive.
+Being clear that I take on work like this on demand is not pushy. Pushy is demanding a meeting or naming a duration. Hiding why I am writing wastes their time and reads as evasive.
 
 LEAD WITH THE PROBLEM, NOT THE SKILL. "Reconciliation across multiple entities is usually the part that breaks" beats "I have BigQuery experience": the first shows I understand their situation, the second is a line from a CV.
 

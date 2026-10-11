@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError } from '@/api/client'
 import { outreachApi } from '@/api/outreach'
-import type { CloseStatus, OutreachDetailOut } from '@/api/types'
+import type { CloseStatus, EmailFollowUpStage, OutreachDetailOut } from '@/api/types'
 
 export const outreachKeys = {
   detail: (id: number) => ['outreach', id] as const,
@@ -98,6 +98,29 @@ export function useConnect() {
   })
 }
 
+export function useConnectWithoutNote() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (leadId: number) => outreachApi.connectWithoutNote(leadId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
+    },
+  })
+}
+
+export function useDraftEmail() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ leadId, followUpStage }: { leadId: number; followUpStage?: EmailFollowUpStage }) =>
+      outreachApi.draftEmail(leadId, followUpStage),
+    onSuccess: (data) => {
+      queryClient.setQueryData(outreachKeys.detail(data.id), data)
+      queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)
+    },
+  })
+}
+
 export function usePassOnLead() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -158,7 +181,8 @@ export function useMarkSent() {
 export function useReply() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: string }) => outreachApi.reply(id, body),
+    mutationFn: ({ id, body, channel }: { id: number; body: string; channel?: 'linkedin' | 'email' }) =>
+      outreachApi.reply(id, body, channel),
     onSuccess: (data) => {
       queryClient.setQueryData(outreachKeys.detail(data.id), data)
       queryClient.setQueryData(outreachKeys.byLead(data.lead_id), data)

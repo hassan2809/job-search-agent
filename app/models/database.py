@@ -23,7 +23,12 @@ def _add_missing_columns() -> None:
     """
     if engine.dialect.name != "sqlite":
         return
-    additions = {"matches": {"lead_type": "VARCHAR(20)"}}
+    additions = {
+        "matches": {"lead_type": "VARCHAR(20)"},
+        # DEFAULT 'linkedin' backfills every message that existed before this column did -- they
+        # were all LinkedIn messages, since email didn't exist as a channel yet.
+        "outreach_messages": {"channel": "VARCHAR(10) DEFAULT 'linkedin'"},
+    }
     with engine.begin() as conn:
         for table, columns in additions.items():
             existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}

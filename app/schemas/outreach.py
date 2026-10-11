@@ -21,6 +21,7 @@ class OutreachMessageOut(BaseModel):
     outreach_id: int
     sender: str
     body: str
+    channel: str = "linkedin"
     created_at: datetime
     # Rules this draft still breaks after the retry. Empty for clean drafts and for anything the
     # lead sent. Populated from the draft_checks row, so the UI can mark a draft worth editing.
@@ -70,6 +71,12 @@ class ConnectionResponseIn(BaseModel):
 
 class ReplyIn(BaseModel):
     body: str  # a single new message, or a full pasted thread to sync retroactively
+    channel: str = "linkedin"  # linkedin | email -- which channel this reply came in on
+
+
+class EmailDraftIn(BaseModel):
+    # opening (first email) | value_add (day-4 follow-up) | clear_ask (day-10 follow-up)
+    follow_up_stage: str = "opening"
 
 
 class EpisodeOut(BaseModel):

@@ -42,4 +42,8 @@ class OutreachMessage(Base):
     outreach_id: Mapped[int] = mapped_column(ForeignKey("outreaches.id"))
     sender: Mapped[str] = mapped_column(String(10))  # me | them
     body: Mapped[str] = mapped_column(Text)
+    # linkedin | email. Which channel this specific message went out on -- a lead can get both, so
+    # this lives on the message, not the outreach. Defaults to "linkedin" since every message before
+    # this column existed was one.
+    channel: Mapped[str] = mapped_column(String(10), default="linkedin")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))

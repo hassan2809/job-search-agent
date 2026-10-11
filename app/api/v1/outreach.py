@@ -16,6 +16,7 @@ from app.schemas.outreach import (
     CheckStatRow,
     CloseIn,
     ConnectionResponseIn,
+    EmailDraftIn,
     EpisodeOut,
     EpisodesOut,
     MatchOut,
@@ -57,21 +58,25 @@ router = APIRouter()
 # "First Follow-up: 3-5 days after acceptance". Drafting the first message straight after
 # connection_accepted is unaffected -- that path never consults this.
 # The strategy doc's ladder is written for an agency selling a service (value proposition ->
-# case study -> solution proposal -> soft close). I'm a developer looking for work, not a vendor,
-# so the same four-step spacing is kept but each step is what a developer would actually say.
+# case study -> solution proposal -> soft close). As of 11 Oct 2026 I run a one-person company, not
+# a job seeker and not an agency either, so the same four-step spacing is kept but each step asks
+# for a low-friction offer (see ASK_GUIDANCE in app/services/outreach.py), never "are you hiring" --
+# that framing was identified as a root cause of the first run's 0-conversations outcome. See
+# _internal/Linkedin_agent_review.txt section 2.4.
 MESSAGE_STAGES = [
     {
         "purpose": "Open the conversation. Lead with their product, mission or open role and why it "
         "genuinely interests me. Where their stack or a concrete technical problem is visible in the "
         "lead text, name it and be specific about the relief I offer rather than promising broad "
         "improvement. One clause at most on the part of my background that connects. "
-        "End on a LIGHT ROUTING QUESTION, not a pitch: 'is this the kind of thing you bring someone "
-        "in for?' or 'who would be the right person to talk to about this?'. A senior person can "
-        "answer either in five words, and the answer decides everything that follows, so it is worth "
-        "spending the first message's one question on. "
-        "DO NOT describe a project in any detail and DO NOT include my portfolio link: showing the "
-        "work is the NEXT message's whole job, and spending it here leaves that message with nothing "
-        "to say and makes the follow-up read as a repeat",
+        "End on a LIGHT ROUTING QUESTION, never a hiring question: 'who usually handles that kind of "
+        "thing on your end?' or 'would a quick breakdown of how I'd approach it be useful?'. Never "
+        "'is this the kind of thing you bring someone in for' or anything implying I want to be "
+        "hired as an employee. A senior person can answer either in five words, and the answer "
+        "decides everything that follows, so it is worth spending the first message's one question "
+        "on. DO NOT describe a project in any detail and DO NOT include my portfolio link: showing "
+        "the work is the NEXT message's whole job, and spending it here leaves that message with "
+        "nothing to say and makes the follow-up read as a repeat",
         "min_days": 3,
     },
     {
@@ -85,10 +90,12 @@ MESSAGE_STAGES = [
         "min_days": 5,
     },
     {
-        "purpose": "THE DIRECT ASK. Stage 1 asked lightly and got no answer, so ask plainly now: is "
-        "there a role, a contract or a project where I would fit, and if not, who should I be "
-        "talking to. Still anchored to their work, still short. This is the message that makes the "
-        "purpose of the whole thread explicit, so do not hedge it",
+        "purpose": "THE DIRECT OFFER. Stage 1 asked lightly and got no answer, so be plain now, but "
+        "the offer is still never 'are you hiring' or 'is there a role for me'. Name the specific "
+        "low-friction thing from ASK_GUIDANCE that fits this lead (a short Loom/demo, a write-up, an "
+        "architecture walkthrough, or an overflow-capacity chat if they're an agency) and ask "
+        "plainly whether it would be useful. Still anchored to their work, still short. This is the "
+        "message that makes the purpose of the whole thread explicit, so do not hedge it",
         "min_days": 6,
     },
     {
@@ -97,8 +104,8 @@ MESSAGE_STAGES = [
         "describe anything I have built. Do NOT include a stack. Do NOT end with a question. "
         "Assume the timing simply isn't right, say so without a hint of grievance, and leave one "
         "concrete standing offer: if they ever hit a tight deadline or need an extra pair of hands "
-        "to clear a backlog, I am around. Being someone's on-call backup developer is a smaller and "
-        "more useful thing to be remembered for than being someone who wanted a job. Two or three "
+        "on short notice, I am around, no monthly contract needed. Being someone's on-call option is "
+        "a smaller and more useful thing to be remembered for than having pitched hard. Two or three "
         "sentences, warm and final. My portfolio link may appear once at the end, plainly, and "
         "nothing else. If it reads like a pitch, it is wrong",
         "min_days": 7,
@@ -260,13 +267,114 @@ def connect(lead_id: int, force: bool = False, db: Session = Depends(get_db)) ->
     )
     db.add(new_outreach)
     db.flush()
-    message = OutreachMessage(outreach_id=new_outreach.id, sender="me", body=draft.body)
+    message = OutreachMessage(outreach_id=new_outreach.id, sender="me", body=draft.body, channel="linkedin")
     db.add(message)
     db.flush()
     _record_check(db, new_outreach.id, message.id, "connection_note", None, draft)
     db.commit()
     db.refresh(new_outreach)
     return _detail(new_outreach, db)
+
+
+@router.post("/{lead_id}/connect-without-note", response_model=OutreachDetailOut)
+def connect_without_note(lead_id: int, db: Session = Depends(get_db)) -> OutreachDetailOut:
+    """Starts the connection without an LLM-drafted note, for when LinkedIn Premium's note limit is
+    the bottleneck, not message quality. No draft to review here, so this goes straight to
+    'connection_sent' -- the human still has to go send the note-less request on LinkedIn itself,
+    same as every other 'drafted' status implies a real-world action before the next step applies.
+
+    Idempotent the same way /connect is: returns the existing outreach if one is already underway,
+    since there is nothing here that benefits from a force=true re-run."""
+    lead = _get_lead_or_404(lead_id, db)
+
+    existing = db.execute(
+        select(Outreach).where(Outreach.lead_id == lead.id).order_by(Outreach.created_at.desc())
+    ).scalars().first()
+    if existing:
+        return _detail(existing, db)
+
+    latest_match = db.execute(
+        select(Match).where(Match.lead_id == lead.id).order_by(Match.created_at.desc())
+    ).scalars().first()
+    if not latest_match:
+        raise HTTPException(status_code=409, detail="Run /fit-check before connecting")
+    if latest_match.fit_verdict == "not_a_fit":
+        raise HTTPException(status_code=409, detail="Fit-check verdict is 'not_a_fit' -- not connecting")
+
+    new_outreach = Outreach(
+        lead_id=lead.id, match_id=latest_match.id, origin_type=lead.origin_type, status="connection_sent"
+    )
+    db.add(new_outreach)
+    db.commit()
+    db.refresh(new_outreach)
+    return _detail(new_outreach, db)
+
+
+@router.post("/{lead_id}/email", response_model=OutreachDetailOut)
+def draft_email(lead_id: int, email_in: EmailDraftIn, db: Session = Depends(get_db)) -> OutreachDetailOut:
+    """Drafts a cold email: the opening touch, or a day-4/day-10 follow-up (email_in.follow_up_stage).
+
+    Not idempotent like /connect -- the whole point of a follow-up is sending a second and third
+    email to the same lead, so every call drafts a fresh one rather than returning an old draft.
+
+    If no outreach exists yet for this lead, creates one straight into 'message_drafted': email has
+    no LinkedIn-style accept/decline gate, so it skips the connection_* states entirely and joins the
+    same awaiting-reply / follow-up / close machinery every other message already uses.
+    """
+    lead = _get_lead_or_404(lead_id, db)
+
+    outreach = db.execute(
+        select(Outreach).where(Outreach.lead_id == lead.id).order_by(Outreach.created_at.desc())
+    ).scalars().first()
+
+    latest_match = db.execute(
+        select(Match).where(Match.lead_id == lead.id).order_by(Match.created_at.desc())
+    ).scalars().first()
+    if not latest_match:
+        raise HTTPException(status_code=409, detail="Run /fit-check before emailing")
+    if latest_match.fit_verdict == "not_a_fit":
+        raise HTTPException(status_code=409, detail="Fit-check verdict is 'not_a_fit' -- not emailing")
+    if not (lead.contact_email or "").strip():
+        raise HTTPException(
+            status_code=409,
+            detail="No contact_email on this lead -- look it up (Hunter.io or the company site) and "
+            "save it on the lead before drafting an email.",
+        )
+
+    # A lead closed out on LinkedIn (e.g. closed_not_seen) is still worth a fresh email touch --
+    # that is explicitly part of the plan, not a reason to leave the thread looking closed. Reopen
+    # the existing outreach rather than leaving a live email sitting under a closed_* status, where
+    # the UI's closed-thread view would hide it.
+    if outreach and (outreach.status in CLOSE_STATUSES or outreach.status in {"connection_declined", "connection_no_response"}):
+        outreach.status = "message_drafted"
+
+    email_thread = [m for m in _thread(outreach.id, db) if m.channel == "email"] if outreach else []
+
+    try:
+        draft = outreach_service.draft_email(
+            lead,
+            email_thread,
+            latest_match.fit_reasoning,
+            lead.origin_type,
+            follow_up_stage=email_in.follow_up_stage,
+        )
+    except LLMNotConfiguredError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    if not outreach:
+        outreach = Outreach(
+            lead_id=lead.id, match_id=latest_match.id, origin_type=lead.origin_type, status="message_drafted"
+        )
+        db.add(outreach)
+        db.flush()
+
+    message = OutreachMessage(outreach_id=outreach.id, sender="me", body=draft.body, channel="email")
+    db.add(message)
+    db.flush()
+    _record_check(db, outreach.id, message.id, f"email_{email_in.follow_up_stage}", None, draft)
+    db.commit()
+    db.refresh(outreach)
+    return _detail(outreach, db)
 
 
 @router.post("/{lead_id}/pass", response_model=OutreachOut)
@@ -488,7 +596,7 @@ def reply(id: int, reply_in: ReplyIn, db: Session = Depends(get_db)) -> Outreach
     lead = _get_lead_or_404(outreach.lead_id, db)
     match = db.get(Match, outreach.match_id) if outreach.match_id else None
 
-    db.add(OutreachMessage(outreach_id=outreach.id, sender="them", body=reply_in.body))
+    db.add(OutreachMessage(outreach_id=outreach.id, sender="them", body=reply_in.body, channel=reply_in.channel))
     outreach.status = "replied"
     db.flush()
 
@@ -500,7 +608,9 @@ def reply(id: int, reply_in: ReplyIn, db: Session = Depends(get_db)) -> Outreach
         db.commit()
         raise HTTPException(status_code=503, detail=str(e)) from e
 
-    message = OutreachMessage(outreach_id=outreach.id, sender="me", body=draft.body)
+    # Suggested reply goes out on whichever channel they replied on, so a thread doesn't silently
+    # cross from email to LinkedIn or back.
+    message = OutreachMessage(outreach_id=outreach.id, sender="me", body=draft.body, channel=reply_in.channel)
     db.add(message)
     db.flush()
     _record_check(db, outreach.id, message.id, "reply_suggestion", None, draft)
