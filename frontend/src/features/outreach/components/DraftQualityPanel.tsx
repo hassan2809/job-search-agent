@@ -23,7 +23,7 @@ export function DraftQualityPanel() {
   const cleanRate = Math.round((data.clean_first_time / data.drafts) * 100)
 
   return (
-    <Card size="sm" className="mb-4">
+    <Card size="sm">
       <CardHeader>
         <CardTitle className="text-sm">Draft quality</CardTitle>
       </CardHeader>

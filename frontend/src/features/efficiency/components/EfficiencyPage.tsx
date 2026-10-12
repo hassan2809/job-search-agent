@@ -61,7 +61,7 @@ function OutcomeBar({ outcome, count, max }: { outcome: EpisodeOutcome; count: n
   const pct = max > 0 ? Math.round((count / max) * 100) : 0
   return (
     <div className="flex items-center gap-2">
-      <Badge variant={OUTCOME_VARIANT[outcome]} className="w-44 shrink-0 justify-start">
+      <Badge variant={OUTCOME_VARIANT[outcome]} className="w-52 shrink-0 justify-start whitespace-normal text-left">
         {OUTCOME_LABELS[outcome] ?? outcome}
       </Badge>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
@@ -79,40 +79,33 @@ export function EfficiencyPage() {
   const { data: checkStats } = useCheckStats()
 
   return (
-    <div className="min-h-svh bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">Efficiency</h1>
-            <p className="text-sm text-muted-foreground">
-              What past outreach actually taught -- reconstructed from outcomes, nothing stored twice.
-            </p>
-          </div>
-          <Link to="/" className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground">
-            Back to leads
-          </Link>
-        </div>
-      </header>
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-foreground">Efficiency</h1>
+        <p className="text-sm text-muted-foreground">
+          What past outreach actually taught -- reconstructed from outcomes, nothing stored twice.
+        </p>
+      </div>
 
-      <main className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-6">
-        {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
-        {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
+      {error && <p className="text-sm text-destructive">{error.message}</p>}
 
-        {data && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>Overview</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-6">
-                <Stat label="Total outreaches" value={data.summary.total} />
-                <Stat label="With a known outcome" value={data.summary.with_known_outcome} />
-                <Stat label="Replied" value={data.summary.replied} />
-                <Stat label="Still open" value={data.summary.open} />
-                <Stat label="Dropped (my call)" value={data.summary.dropped_by_me} />
-              </CardContent>
-            </Card>
+      {data && (
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Overview</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-6">
+              <Stat label="Total outreaches" value={data.summary.total} />
+              <Stat label="With a known outcome" value={data.summary.with_known_outcome} />
+              <Stat label="Replied" value={data.summary.replied} />
+              <Stat label="Still open" value={data.summary.open} />
+              <Stat label="Dropped (my call)" value={data.summary.dropped_by_me} />
+            </CardContent>
+          </Card>
 
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Outcome funnel</CardTitle>
@@ -173,7 +166,9 @@ export function EfficiencyPage() {
                 </CardContent>
               </Card>
             )}
+          </div>
 
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Learned guidance</CardTitle>
@@ -218,45 +213,45 @@ export function EfficiencyPage() {
                 </CardContent>
               </Card>
             )}
+          </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent episodes</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {data.episodes.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Nothing sent yet.</p>
-                )}
-                {[...data.episodes]
-                  .reverse()
-                  .slice(0, 25)
-                  .map((episode) => (
-                    <div key={episode.outreach_id} className="flex flex-col gap-1 border-b pb-2 last:border-b-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          to={`/leads/${episode.lead_id}`}
-                          className="text-sm font-medium text-foreground hover:underline"
-                        >
-                          {episode.lead_author || `Lead #${episode.lead_id}`}
-                        </Link>
-                        <Badge variant={OUTCOME_VARIANT[episode.outcome]}>
-                          {OUTCOME_LABELS[episode.outcome] ?? episode.outcome}
-                        </Badge>
-                        {episode.lead_type && <span className="text-xs text-muted-foreground">{episode.lead_type}</span>}
-                        <span className="text-xs text-muted-foreground">
-                          {episode.stages_sent} message{episode.stages_sent === 1 ? '' : 's'} sent
-                        </span>
-                      </div>
-                      {episode.hook && (
-                        <p className="text-xs text-muted-foreground">Opened: "{episode.hook}"</p>
-                      )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent episodes</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
+              {data.episodes.length === 0 && (
+                <p className="text-sm text-muted-foreground">Nothing sent yet.</p>
+              )}
+              {[...data.episodes]
+                .reverse()
+                .slice(0, 25)
+                .map((episode) => (
+                  <div key={episode.outreach_id} className="flex flex-col gap-1 border-b pb-2 last:border-b-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        to={`/leads/${episode.lead_id}`}
+                        className="text-sm font-medium text-foreground hover:underline"
+                      >
+                        {episode.lead_author || `Lead #${episode.lead_id}`}
+                      </Link>
+                      <Badge variant={OUTCOME_VARIANT[episode.outcome]}>
+                        {OUTCOME_LABELS[episode.outcome] ?? episode.outcome}
+                      </Badge>
+                      {episode.lead_type && <span className="text-xs text-muted-foreground">{episode.lead_type}</span>}
+                      <span className="text-xs text-muted-foreground">
+                        {episode.stages_sent} message{episode.stages_sent === 1 ? '' : 's'} sent
+                      </span>
                     </div>
-                  ))}
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </main>
+                    {episode.hook && (
+                      <p className="text-xs text-muted-foreground">Opened: "{episode.hook}"</p>
+                    )}
+                  </div>
+                ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

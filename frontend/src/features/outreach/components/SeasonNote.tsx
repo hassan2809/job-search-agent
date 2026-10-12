@@ -13,7 +13,7 @@ export function SeasonNote() {
   if (!advice) return null
 
   return (
-    <p className={`mb-4 rounded-md border px-3 py-2 text-sm ${TONE_STYLE[advice.tone]}`}>
+    <p className={`rounded-md border px-3 py-2 text-sm ${TONE_STYLE[advice.tone]}`}>
       {advice.note}
     </p>
   )

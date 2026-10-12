@@ -18,7 +18,7 @@ export function PendingConnectionsBoard() {
   const shown = showAll ? data : data.slice(0, PAGE)
 
   return (
-    <Card size="sm" className="mb-4">
+    <Card size="sm">
       <CardHeader>
         <CardTitle className="text-sm">
           {data.length} connection request{data.length === 1 ? '' : 's'} with no answer recorded

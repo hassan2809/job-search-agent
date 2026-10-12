@@ -11,7 +11,7 @@ export function FollowUpsBoard() {
   if (isLoading || !data?.length) return null
 
   return (
-    <Alert variant="destructive" className="mb-4">
+    <Alert variant="destructive">
       <AlertTitle>
         {data.length} lead{data.length === 1 ? '' : 's'} due for a follow-up
       </AlertTitle>

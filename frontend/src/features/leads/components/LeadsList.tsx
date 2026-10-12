@@ -4,7 +4,6 @@ import { getLeadSubtitle } from '../utils'
 import { useFitCheck } from '@/features/outreach/hooks'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import type { LeadOut, MatchOut } from '@/api/types'
 
 const VERDICT_VARIANT: Record<MatchOut['fit_verdict'], 'default' | 'secondary' | 'destructive'> = {
@@ -36,63 +35,71 @@ export function LeadsList({ leads, isLoading, error }: LeadsListProps) {
   const fitCheck = useFitCheck()
   const [results, setResults] = useState<Record<number, MatchOut>>({})
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Loading leads...</p>
-  if (error) return <p className="text-sm text-destructive">Failed to load leads: {error.message}</p>
-  if (!leads?.length) return <p className="text-sm text-muted-foreground">No leads yet — add one to get started.</p>
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border bg-background p-8 text-center text-sm text-muted-foreground">
+        Loading leads...
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center text-sm text-destructive">
+        Failed to load leads: {error.message}
+      </div>
+    )
+  }
+  if (!leads?.length) {
+    return (
+      <div className="rounded-xl border bg-background p-8 text-center text-sm text-muted-foreground">
+        No leads match these filters.
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-3">
+    <ul className="flex flex-col divide-y rounded-xl border bg-background">
       {leads.map((lead) => {
         const result = results[lead.id]
         const verdict = result?.fit_verdict ?? lead.latest_verdict
         const isChecking = fitCheck.isPending && fitCheck.variables?.leadId === lead.id
-        const subtitle = getLeadSubtitle(lead)
+        const subtitle = result?.fit_reasoning ?? getLeadSubtitle(lead)
 
         return (
-          <Card key={lead.id} size="sm">
-            <CardHeader>
-              <CardTitle>
-                <Link to={`/leads/${lead.id}`} className="hover:underline">
-                  {lead.title || lead.url}
-                </Link>
-              </CardTitle>
-              <CardAction className="flex items-center gap-2">
-                <Badge variant="outline">{lead.origin_type}</Badge>
-                <Button
-                  size="sm"
-                  disabled={isChecking}
-                  onClick={() =>
-                    fitCheck.mutate(
-                      { leadId: lead.id },
-                      { onSuccess: (match) => setResults((prev) => ({ ...prev, [lead.id]: match })) },
-                    )
-                  }
-                >
-                  {isChecking ? 'Checking...' : 'Run fit-check'}
-                </Button>
-              </CardAction>
-            </CardHeader>
+          <li key={lead.id} className="flex flex-wrap items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40">
+            <div className="min-w-0 flex-1 basis-60">
+              <Link to={`/leads/${lead.id}`} className="block truncate font-medium text-foreground hover:underline">
+                {lead.title || lead.url}
+              </Link>
+              {subtitle && <p className="line-clamp-1 text-sm text-muted-foreground">{subtitle}</p>}
+            </div>
 
-            {subtitle && (
-              <CardContent>
-                <p className="line-clamp-1 text-sm text-muted-foreground">{subtitle}</p>
-              </CardContent>
-            )}
+            <div className="flex flex-shrink-0 items-center gap-1.5">
+              <Badge variant="outline">{lead.origin_type}</Badge>
+              {verdict && <Badge variant={VERDICT_VARIANT[verdict]}>{verdict}</Badge>}
+              {lead.latest_outreach_status && (
+                <Badge variant={outreachStatusVariant(lead.latest_outreach_status)}>
+                  {lead.latest_outreach_status}
+                </Badge>
+              )}
+            </div>
 
-            {(verdict || lead.latest_outreach_status) && (
-              <CardFooter className="flex items-center gap-2">
-                {verdict && <Badge variant={VERDICT_VARIANT[verdict]}>{verdict}</Badge>}
-                {lead.latest_outreach_status && (
-                  <Badge variant={outreachStatusVariant(lead.latest_outreach_status)}>
-                    {lead.latest_outreach_status}
-                  </Badge>
-                )}
-                {result && <span className="line-clamp-1 text-sm text-muted-foreground">{result.fit_reasoning}</span>}
-              </CardFooter>
-            )}
-          </Card>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isChecking}
+              onClick={() =>
+                fitCheck.mutate(
+                  { leadId: lead.id },
+                  { onSuccess: (match) => setResults((prev) => ({ ...prev, [lead.id]: match })) },
+                )
+              }
+            >
+              {isChecking ? 'Checking...' : 'Run fit-check'}
+            </Button>
+          </li>
         )
       })}
-    </div>
+    </ul>
   )
 }

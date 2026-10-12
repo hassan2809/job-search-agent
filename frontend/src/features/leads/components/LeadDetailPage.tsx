@@ -73,21 +73,17 @@ export function LeadDetailPage() {
   const [result, setResult] = useState<MatchOut | null>(null)
 
   return (
-    <div className="min-h-svh bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="mx-auto max-w-2xl px-6 py-4">
-          <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Back to leads
-          </Link>
-        </div>
-      </header>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
+        ← Back to leads
+      </Link>
 
-      <main className="mx-auto max-w-2xl px-6 py-6">
-        {isLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
-        {error && <p className="text-sm text-destructive">Failed to load lead: {error.message}</p>}
+      {isLoading && <p className="mt-4 text-sm text-muted-foreground">Loading...</p>}
+      {error && <p className="mt-4 text-sm text-destructive">Failed to load lead: {error.message}</p>}
 
-        {lead && (
-          <div className="flex flex-col gap-4">
+      {lead && (
+        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-semibold text-foreground">{lead.title}</h1>
@@ -126,6 +122,10 @@ export function LeadDetailPage() {
               )}
             </Card>
 
+            <LeadProfileView description={lead.description} />
+          </div>
+
+          <div className="lg:sticky lg:top-20">
             <Card size="sm">
               <CardHeader>
                 <CardTitle className="text-base">Outreach</CardTitle>
@@ -138,11 +138,9 @@ export function LeadDetailPage() {
                 />
               </CardContent>
             </Card>
-
-            <LeadProfileView description={lead.description} />
           </div>
-        )}
-      </main>
+        </div>
+      )}
     </div>
   )
 }
